@@ -8,16 +8,16 @@ Automatic treatment effect estimation on ecological data with partial labelling
 
 ### Example
 
-<div style="display:flex; justify-content:center; align-items:center;">
-  <div style="margin-right:10px;">
-    <p><i>No Action</i></p>
-    <img src="img/example_nogrooming.gif" alt="grooming" width="200">
-  </div>
-  <div style="margin-left:10px;">
-    <p><i>Grooming (Yellow)</i></p>
-    <img src="img/example_grooming.gif" alt="nogrooming" width="200">
-  </div>
-</div>
+<table align="center">
+  <tr>
+    <th>No Action</th>
+    <th>Grooming (<i>yellow ant to focal ant</i>)</th>
+  </tr>
+  <tr>
+    <td><img src="img/example_nogrooming.gif" alt="GIF 1" width="300" height="300"></td> 
+    <td><img src="img/example_grooming.gif" alt="GIF 2" width="300" height="300"></td>
+  </tr>
+</table>
 
 ### Data Distribution
 
