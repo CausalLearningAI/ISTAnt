@@ -23,7 +23,7 @@ def generator(reduce_fps_factor, downscale_factor, environment='train'):
         end_frame_column = 'End Frame Annotation'
     elif environment == 'test':
         start_frame_column = 'End Frame Annotation'
-        end_frame_column = 'Valid Until Frame'
+        end_frame_column = 'Valid until frame'
     else:
         raise ValueError(f'Unknown environment: {environment}')
     settings = pd.read_csv(f'./data/experiments_settings.csv')
