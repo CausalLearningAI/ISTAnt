@@ -1,7 +1,61 @@
 import torch
 import pandas as pd
 import cv2
+import os
+from datasets import Dataset
 
+def load_data(environment='train', path_dir="./data/", generate=False, reduce_fps_factor=10, downscale_factor=0.4):
+    if generate:
+        dataset = Dataset.from_generator(generator, gen_kwargs={"reduce_fps_factor": reduce_fps_factor, "downscale_factor": downscale_factor, "environment":environment})
+        dataset.save_to_disk(path_dir+environment)
+        dataset.set_format(type="torch", columns=["image", "treatment", "outcome"], output_all_columns=True)
+    else:
+        # check if the dataset is already saved
+        if not os.path.exists(path_dir+environment):
+            raise Exception("The dataset is not saved, please set generate=True to generate the dataset, or correct the path_dir.")
+        dataset = Dataset.load_from_disk(path_dir+environment)
+        dataset.set_format(type="torch", columns=["image", "treatment", "outcome"], output_all_columns=True)
+    return dataset
+
+def generator(reduce_fps_factor, downscale_factor, environment='train'):
+    if environment == 'train':
+        start_frame_column = 'Starting Frame'
+        end_frame_column = 'End Frame Annotation'
+    elif environment == 'test':
+        start_frame_column = 'End Frame Annotation'
+        end_frame_column = 'Valid Until Frame'
+    else:
+        raise ValueError(f'Unknown environment: {environment}')
+    settings = pd.read_csv(f'./data/experiments_settings.csv')
+    for exp in ["a", "b", "c", "d", "e"]:
+        print(f"Loading experiment {exp}")
+        for pos in range(1, 10):
+            print(f"Loading position {pos}")
+            if (exp == "c" and pos == 9):
+                continue
+            start_frame = int(settings[settings.Experiment == f'{exp}{pos}'][start_frame_column].values[0]/reduce_fps_factor)
+            end_frame = int(settings[settings.Experiment == f'{exp}{pos}'][end_frame_column].values[0]/reduce_fps_factor)
+            treatment = settings[settings.Experiment == f'{exp}{pos}']['Treatment'].values[0].astype(int)
+            # load file .mkv
+            frames = load_frames(exp, pos, 
+                                 reduce_fps_factor=reduce_fps_factor, 
+                                 downscale_factor=downscale_factor, 
+                                 start_frame=start_frame, 
+                                 end_frame=end_frame)
+            # load annotations
+            labels = load_labels(exp, pos, 
+                                 reduce_fps_factor=reduce_fps_factor,
+                                 start_frame=start_frame,
+                                 end_frame=end_frame)
+            for i in range(end_frame-start_frame):
+                yield {
+                    "experiment": exp,
+                    "position": pos,
+                    "frame": i,
+                    "image": frames[i],
+                    "treatment": treatment,
+                    "outcome": labels[i,:],
+                }
 
 def map_behaviour_to_label(behaviour):
     if behaviour == ' groom-yellow':
