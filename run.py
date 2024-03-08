@@ -5,34 +5,42 @@ from data import load_data
 from model import add_embeddings
 import argparse
 
+
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--path_data_dir', type=str, default='./data/', help='Path to the data directory')
-    parser.add_argument('--model_name', type=str, default='google/vit-base-patch16-224', help='Model name')
-    parser.add_argument('--batch_size', type=int, default=100, help='Batch size')
-    parser.add_argument('--num_proc', type=int, default=4, help='Number of processes')
-    parser.add_argument('--environment', type=str, default='train', help='Environment')
-    parser.add_argument('--generate', type=bool, default=True, help='Generate the dataset')
-    parser.add_argument('--reduce_fps_factor', type=int, default=10, help='Reduce fps factor')
-    parser.add_argument('--downscale_factor', type=float, default=0.4, help='Downscale factor')
+    parser.add_argument("--path_data_dir", type=str, default="./data/", help="Path to the data directory")
+    #parser.add_argument( "--model_name", type=str, default="vit", help="Model name")
+    parser.add_argument("--batch_size", type=int, default=10, help="Batch size")
+    parser.add_argument("--num_proc", type=int, default=4, help="Number of processes")
+    parser.add_argument("--environment", type=str, default="train", help="Environment")
+    parser.add_argument("--generate", type=bool, default=False, help="Generate the dataset")
+    parser.add_argument("--reduce_fps_factor", type=int, default=10, help="Reduce fps factor")
+    parser.add_argument("--downscale_factor", type=float, default=0.4, help="Downscale factor")
     return parser
 
+
 def main(args):
-    # Load the data
-    data = load_data(environment=args.environment, 
-                     path_dir=args.path_data_dir, 
-                     generate=args.generate,
-                     reduce_fps_factor=args.reduce_fps_factor,
-                     downscale_factor=args.downscale_factor)
+    data = load_data(
+        environment=args.environment,
+        path_dir=args.path_data_dir,
+        generate=args.generate,
+        reduce_fps_factor=args.reduce_fps_factor,
+        downscale_factor=args.downscale_factor,
+    )
     print("Data generated")
 
-    add_embeddings(data, args.model_name, environment=args.environment)
-    print("Embeddings added")
+    models = ["vit", "dino", "clip"]
+    for model in models:
+        data = add_embeddings(
+                data,
+                model,
+                environment=args.environment,
+                batch_size=args.batch_size,
+                num_proc=args.num_proc,
+            )
+        print(f"Embedding ({model}) added")
+
 
 if __name__ == "__main__":
     args = get_parser().parse_args()
     main(args)
-
-
-
-
