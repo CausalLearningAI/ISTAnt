@@ -11,7 +11,7 @@ Automatic treatment effect estimation on ecological data with partial labelling
 <table align="center">
   <tr>
     <th>No Action</th>
-    <th>Grooming (<i>yellow ant to focal ant</i>)</th>
+    <th>Grooming (<i>Y2F</i>)</th>
   </tr>
   <tr>
     <td><img src="img/example_nogrooming.gif" alt="GIF 1" width="300" height="300"></td> 
