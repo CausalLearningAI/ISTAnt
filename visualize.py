@@ -5,7 +5,7 @@ def plot_outcome_distribution(data, save=False):
     T = data['treatment']
     Y = data['outcome']
     fig, axs = plt.subplots(1, 2, figsize=(12, 5))
-    colors = ['yellow', 'blue']
+    colors = ['Y2F', 'B2F']
     for i, color in enumerate(colors):
         p_Y_0_T_0 = (Y[T==0, i]==0).sum() / Y.shape[0]
         p_Y_1_T_0 = (Y[T==0, i]==1).sum() / Y.shape[0]
@@ -20,7 +20,7 @@ def plot_outcome_distribution(data, save=False):
         axs[i].set_ylabel('p(Y)')
         axs[i].set_ylim(0, 1)
         axs[i].legend()
-        axs[i].set_title(f'Grooming {color}')
+        axs[i].set_title(f'Grooming ({color})')
     if save:
         if not os.path.exists('results'):
             os.makedirs('results')
