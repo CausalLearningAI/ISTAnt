@@ -5,6 +5,8 @@ from transformers import AutoProcessor, CLIPVisionModel
 from torch.utils.data import DataLoader
 import torch
 from tqdm import tqdm
+import os
+import shutil
 
 def get_model(model_name, device="cpu"):
     if model_name == "dino":
@@ -46,7 +48,10 @@ def add_embeddings(data, model_name, batch_size=100, num_proc=4, environment="tr
             embeddings.append(embedding)
         embeddings = torch.cat(embeddings, 0)
         data = data.add_column(model_name, embeddings.tolist())
-        data.save_to_disk(f"./data/{environment}")
+        path_dir = f"./data/{environment}"
+        data.save_to_disk(path_dir+"_new")
+        shutil.rmtree(path_dir)
+        os.rename(path_dir+"_new", path_dir)
 
     return data
 
