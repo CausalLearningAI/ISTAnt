@@ -4,6 +4,13 @@ import cv2
 import os
 from datasets import Dataset
 
+def get_data_sl(environment="train", model_name="vit", data_dir="./data"):
+    data = load_data(environment='train')
+    embedding = Dataset.load_from_disk(f'{data_dir}/{model_name}/{environment}')
+    X = embedding[model_name]
+    y = data["outcome"][:,0]
+    return X, y 
+
 def load_data(environment='train', path_dir="./data/", generate=False, reduce_fps_factor=10, downscale_factor=0.4):
     if generate:
         dataset = Dataset.from_generator(generator, gen_kwargs={"reduce_fps_factor": reduce_fps_factor, "downscale_factor": downscale_factor, "environment":environment})
