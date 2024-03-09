@@ -3,6 +3,7 @@ from transformers import AutoImageProcessor, ResNetForImageClassification
 from transformers import AutoImageProcessor, AutoModel
 from transformers import AutoProcessor, CLIPVisionModel
 from torch.utils.data import DataLoader
+from datasets import Dataset
 import torch
 from tqdm import tqdm
 import os
@@ -35,6 +36,7 @@ def add_embeddings(data, model_name, batch_size=100, num_proc=4, environment="tr
         processor, model = get_model(model_name, device)
         model.eval().requires_grad_(False)
         # data = data.map(lambda x: {"emb1": encoder(x["image"], model, processor, device)}, batch_size=batch_size, batched=True, num_proc=num_proc)
+        
         dataloader = DataLoader(
             data,
             batch_size=batch_size,
@@ -47,12 +49,10 @@ def add_embeddings(data, model_name, batch_size=100, num_proc=4, environment="tr
             embedding = encoder(batch["image"], model, processor, device)
             embeddings.append(embedding)
         embeddings = torch.cat(embeddings, 0)
-        data = data.add_column(model_name, embeddings.tolist())
-        path_dir = f"./data/{environment}"
-        data.save_to_disk(path_dir+"_new")
-        shutil.rmtree(path_dir)
-        os.rename(path_dir+"_new", path_dir)
-
+        embeddings = Dataset.from_dict({model_name: embeddings.tolist()})
+        embeddings.set_format(type="torch", columns=[model_name])
+        embeddings.save_to_disk(f"./data/{model_name}/{environment}")
+        
     return data
 
 
