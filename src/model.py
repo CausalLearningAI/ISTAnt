@@ -7,7 +7,6 @@ from datasets import Dataset
 import torch
 from tqdm import tqdm
 import os
-import shutil
 
 def get_model(model_name, device="cpu"):
     if model_name == "dino":
@@ -28,30 +27,34 @@ def get_model(model_name, device="cpu"):
 
 
 def add_embeddings(data, model_name, batch_size=100, num_proc=4, environment="train"):
-    if model_name in data.features.keys():
-        print(f"Embedding {model_name} already extracted.")
-    else:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f"Device: {device}")
-        processor, model = get_model(model_name, device)
-        model.eval().requires_grad_(False)
-        # data = data.map(lambda x: {"emb1": encoder(x["image"], model, processor, device)}, batch_size=batch_size, batched=True, num_proc=num_proc)
+    subfolders = [f.name for f in os.scandir("./data") if f.is_dir()]
+    if (model_name in subfolders):
+        environments = [f.name for f in os.scandir(f"./data/{model_name}") if f.is_dir()]
+        if (environment in environments):
+            print(f"Embedding {model_name} already extracted.")
+            return data
         
-        dataloader = DataLoader(
-            data,
-            batch_size=batch_size,
-            num_workers=num_proc,
-            pin_memory=True,
-            shuffle=False,
-        )
-        embeddings = []
-        for batch in tqdm(dataloader):
-            embedding = encoder(batch["image"], model, processor, device)
-            embeddings.append(embedding)
-        embeddings = torch.cat(embeddings, 0)
-        embeddings = Dataset.from_dict({model_name: embeddings.tolist()})
-        embeddings.set_format(type="torch", columns=[model_name])
-        embeddings.save_to_disk(f"./data/{model_name}/{environment}")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Device: {device}")
+    processor, model = get_model(model_name, device)
+    model.eval().requires_grad_(False)
+    # data = data.map(lambda x: {"emb1": encoder(x["image"], model, processor, device)}, batch_size=batch_size, batched=True, num_proc=num_proc)
+    
+    dataloader = DataLoader(
+        data,
+        batch_size=batch_size,
+        num_workers=num_proc,
+        pin_memory=True,
+        shuffle=False,
+    )
+    embeddings = []
+    for batch in tqdm(dataloader):
+        embedding = encoder(batch["image"], model, processor, device)
+        embeddings.append(embedding)
+    embeddings = torch.cat(embeddings, 0)
+    embeddings = Dataset.from_dict({model_name: embeddings.tolist()})
+    embeddings.set_format(type="torch", columns=[model_name])
+    embeddings.save_to_disk(f"./data/{model_name}/{environment}")
         
     return data
 
