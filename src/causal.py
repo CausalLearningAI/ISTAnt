@@ -1,12 +1,4 @@
-def compute_ead(Y, T, color="Yellow", verbose=True):
-    if color=="Yellow":
-        Y = Y[:,0]
-    elif color=="Blue":
-        Y = Y[:,1]
-    else:
-        raise ValueError("Invalid Ant color, please select between Yellow and Blue")
-    if verbose: 
-        print(f"Grooming: {color} to Focal ({color[0]}2F)")
+def compute_ead(Y, T, verbose=True):
     E_Y_t0 = Y[T==0].mean()
     E_Y_t1 = Y[T==1].mean()
     E_Y_t2 = Y[T==2].mean()
