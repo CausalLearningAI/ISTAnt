@@ -4,7 +4,7 @@ import cv2
 import os
 from datasets import Dataset
 
-def get_data_cl(environment="train", data_dir="./data", outcome="all"):
+def get_data_cl(environment="train", data_dir="./data/", outcome="all"):
     data = load_data(environment=environment, path_dir=data_dir, generate=False)
     X = None
     t = data["treatment"]
@@ -20,9 +20,9 @@ def get_data_cl(environment="train", data_dir="./data", outcome="all"):
         raise ValueError(f"Outcome {outcome} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
     return X, y, t
 
-def get_data_sl(environment="train", model_name="vit", data_dir="./data", outcome="all"):
+def get_data_sl(environment="train", model_name="vit", data_dir="./data/", outcome="all"):
     data = load_data(environment=environment, path_dir=data_dir, generate=False)
-    embedding = Dataset.load_from_disk(f'{data_dir}/{model_name}/{environment}')
+    embedding = Dataset.load_from_disk(f'{data_dir}{model_name}/{environment}')
     X = embedding[model_name]
     if outcome=="all":
         y = data["outcome"]
