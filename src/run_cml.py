@@ -1,17 +1,18 @@
 import argparse
 from data import get_data_sl, get_data_cl
-from model import train_model, compute_ead
+from train import train_model
+from causal import compute_ead
 from utils import set_seed
 
 
 def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--path_data_dir", type=str, default="./data/", help="Path to the data directory")
-    parser.add_argument("--batch_size", type=int, default=1024, help="Batch size")
-    parser.add_argument("--num_epochs", type=int, default=10, help="Number of epochs")
+    parser.add_argument("--batch_size", type=int, default=256, help="Batch size")
+    parser.add_argument("--num_epochs", type=int, default=2, help="Number of epochs")
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
     parser.add_argument("--model_name", type=str, default="dino", help="Model name")
-    parser.add_argument("--outcome", type=str, default="sum", help="Outcome")
+    parser.add_argument("--outcome", type=str, default="yellow", help="Outcome")
     parser.add_argument("--num_proc", type=int, default=4, help="Number of processes")
     parser.add_argument("--environment", type=str, default="train", help="Environment")
     parser.add_argument("--test_size", type=float, default=0.2, help="Test size")
@@ -27,6 +28,7 @@ def main(args):
     print("Loading data")
     X, y = get_data_sl(environment=args.environment, 
                        model_name=args.model_name, 
+                       data_dir=args.path_data_dir,
                        outcome=args.outcome)
     
     print("Training Model")
@@ -36,17 +38,21 @@ def main(args):
                         num_epochs=args.num_epochs, 
                         lr=args.lr, 
                         verbose=args.verbose)
+    y_pred = model.pred(X)
+    y_cond_exp = model.cond_exp(X)
 
     print("ATE Estimation")
     X, y, t = get_data_cl(environment=args.environment, 
-                          model_name=args.model_name, 
+                          data_dir=args.path_data_dir,
                           outcome=args.outcome)
-    ate = compute_ead(y, t)
-    ate_ml = compute_ead(model(X).sigmoid(), t)
-    # ate_cl = compute_ate(y, t, X) TODO
-    print(f"ATE (GT): {ate}")
-    print(f"ATE (ML): {ate_ml}")
-    # print(f"ATE (CL): {ate_cl}") TODO
+    print(f"ATE (GT)")
+    ate_B, ate_inf = compute_ead(y, t, verbose=args.verbose)
+    print(f"ATE (ML)")
+    ate_ml_B, ate_ml_inf = compute_ead(y_cond_exp, t, verbose=args.verbose)
+    print(f"ATE (ML disc.)")
+    ate_ml_d_B, ate_ml_d_inf = compute_ead(y_pred, t, verbose=args.verbose)
+    #print(f"ATE (CL)")
+    #ate_cl_B, ate_cl_inf = compute_ate(y, t, X) TODO
 
 if __name__ == "__main__":
     args = get_parser().parse_args()
