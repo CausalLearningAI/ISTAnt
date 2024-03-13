@@ -3,9 +3,9 @@ from transformers import AutoImageProcessor, ResNetForImageClassification
 from transformers import AutoImageProcessor, AutoModel
 from transformers import AutoProcessor, CLIPVisionModel
 from torch.utils.data import DataLoader
+import torch
 from torch import nn
 from datasets import Dataset
-import torch
 from tqdm import tqdm
 import os
 
@@ -84,9 +84,9 @@ class MLP(nn.Module):
     def forward(self, X):
         return self.model(X) # [9, 7, -5]
     def probs(self, X):
-        return nn.Sigmoid(self.model(X)) # [0.8, 0.19, 0.01]
+        return nn.functional.softmax(self.model(X), dim=1) # [0.8, 0.19, 0.01]
     def pred(self, X):
-        return self.model(X).argmax(dim=1) # 0
+        return self.model(X).argmax(dim=1).float() # 0.0
     def cond_exp(self, X):
         values = torch.tensor(range(self.output_size)).float() 
         probs = self.probs(X)
