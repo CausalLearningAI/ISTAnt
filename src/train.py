@@ -40,16 +40,16 @@ def train_model(X, y, test_size=0.2, random_state=42, batch_size=1024, num_epoch
             train_loss += loss.item()
         if verbose: print(f"  Train: Loss={train_loss / len(train_loader):.3f}")
         
-        train_acc, train_f1score = evaluate_model(model, train_loader)
+        train_acc, train_f1score = evaluate_model(model, X_train, y_train)
         if verbose: print(f"  Train: Accuracy={train_acc:.3f}, F1 Score={train_f1score:.3f}")
-        val_acc, val_f1score = evaluate_model(model, val_loader)
+        val_acc, val_f1score = evaluate_model(model, X_val, y_val)
         if verbose: print(f"  Val:   Accuracy={val_acc:.3f}, F1 Score={val_f1score:.3f}")
 
     return model
 
-def evaluate_model(model, data_loader):
+def evaluate_model(model, X, y):
     model.eval()
     with torch.no_grad():
-        acc = sum((model.pred(X_batch) == y_batch).sum().item() for X_batch, y_batch in data_loader) / len(data_loader.dataset)
-        f1score = sum(f1_score(y_batch, model.pred(X_batch), average="macro") for X_batch, y_batch in data_loader) / len(data_loader)
+        acc = (model.pred(X) == y).float().mean().item()
+        f1score = f1_score(y, model.pred(X), average="macro")
     return acc, f1score
