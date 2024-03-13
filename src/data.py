@@ -20,6 +20,25 @@ def get_data_cl(environment="train", data_dir="./data/", outcome="all"):
         raise ValueError(f"Outcome {outcome} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
     return X, y, t
 
+def get_example(environment="train", data_dir="./data/", idx=600, outcome="all", model_name="dino"):
+    data = load_data(environment=environment, path_dir=data_dir, generate=False)
+    image = data[idx]["image"]
+    if outcome=="all":
+        y = data[idx]["outcome"]
+    elif outcome.lower()=="yellow":
+        y = data[idx]["outcome"][0]
+    elif outcome.lower()=="blue":
+        y = data[idx]["outcome"][1]
+    elif outcome.lower()=="sum":
+        y = data[idx]["outcome"].sum()
+    else:
+        raise ValueError(f"Outcome {outcome} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
+    del data
+    embeddings = Dataset.load_from_disk(f'{data_dir}{model_name}/{environment}')
+    embedding = embeddings[idx][model_name]
+    return image, y, embedding
+
+    
 def get_data_sl(environment="train", model_name="vit", data_dir="./data/", outcome="all"):
     data = load_data(environment=environment, path_dir=data_dir, generate=False)
     embedding = Dataset.load_from_disk(f'{data_dir}{model_name}/{environment}')

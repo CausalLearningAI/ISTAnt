@@ -15,7 +15,6 @@ def train_model(X, y, test_size=0.2, random_state=42, batch_size=1024, num_epoch
                                                       random_state=random_state)
 
     train_loader = DataLoader(TensorDataset(X_train, y_train), batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(TensorDataset(X_val, y_val), batch_size=batch_size, shuffle=False)
 
     input_size = X.shape[1]
     hidden_size = 100

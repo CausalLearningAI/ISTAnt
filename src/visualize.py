@@ -1,5 +1,31 @@
 import matplotlib.pyplot as plt
+from data import get_example
 import os
+
+def visualize_examples(idxs, outcome, model_name, model, save=True, path_results_dir="./results/"):
+    n = len(idxs)
+    if n < 6:
+        columns = n
+    else:
+        columns = 6   
+    rows = n//6 + 1
+    fig = plt.figure(figsize=(13, rows*2.7))
+    ax = []
+    for i, idx in enumerate(idxs):
+        img, y, emb = get_example(environment="train", 
+                                    idx=idx, 
+                                    outcome=outcome, 
+                                    model_name=model_name)
+        y_pred = model.pred(emb)
+        plt.rc('font', size=8)
+        ax.append(fig.add_subplot(rows, columns, i + 1))
+        ax[-1].set_title(f"Outcome: {y}, Pred: {y_pred}")
+        plt.imshow(img)
+    if save: 
+        if not os.path.exists(path_results_dir):
+            os.makedirs(path_results_dir)
+        plt.savefig(f"path_results_dir+", bbox_inches='tight')
+    plt.show()
 
 def plot_outcome_distribution(data, save=False, total=True):
     T = data['treatment']

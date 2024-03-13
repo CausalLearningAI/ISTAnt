@@ -3,11 +3,15 @@ from data import get_data_sl, get_data_cl
 from train import train_model
 from causal import compute_ead
 from utils import set_seed
+from visualize import visualize_examples
+
+import torch
 
 
 def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--path_data_dir", type=str, default="./data/", help="Path to the data directory")
+    parser.add_argument("--path_results_dir", type=str, default="./results/", help="Path to the results directory")
     parser.add_argument("--batch_size", type=int, default=256, help="Batch size")
     parser.add_argument("--num_epochs", type=int, default=2, help="Number of epochs")
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
@@ -40,6 +44,15 @@ def main(args):
                         verbose=args.verbose)
     y_pred = model.pred(X)
     y_cond_exp = model.cond_exp(X)
+
+    # get 36 integeres at random in [0,len(y)] with torch
+    idxs = torch.randint(0, len(y), (36,))
+    visualize_examples(idxs, 
+                       outcome=args.outcome, 
+                       model_name=args.model_name, 
+                       model=model, 
+                       save=True, 
+                       path_results_dir="./results/")
 
     print("ATE Estimation")
     X, y, t = get_data_cl(environment=args.environment, 
