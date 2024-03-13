@@ -3,6 +3,7 @@ from transformers import AutoImageProcessor, ResNetForImageClassification
 from transformers import AutoImageProcessor, AutoModel
 from transformers import AutoProcessor, CLIPVisionModel
 from torch.utils.data import DataLoader
+from torch import nn
 from datasets import Dataset
 import torch
 from tqdm import tqdm
@@ -70,3 +71,23 @@ def encoder(x, model, processor, device):
     else:
         raise ValueError(f"Unkown model class: {model_name_full}")
     return emb.to("cpu")
+
+class MLP(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super().__init__()
+        self.output_size = output_size
+        self.model = nn.Sequential(
+                            nn.Linear(input_size, hidden_size),
+                            nn.ReLU(),
+                            nn.Linear(hidden_size, output_size) 
+                        )
+    def forward(self, X):
+        return self.model(X) # [9, 7, -5]
+    def probs(self, X):
+        return nn.Sigmoid(self.model(X)) # [0.8, 0.19, 0.01]
+    def pred(self, X):
+        return self.model(X).argmax(dim=1) # 0
+    def cond_exp(self, X):
+        values = torch.tensor(range(self.output_size)).float() 
+        probs = self.probs(X)
+        return torch.matmul(probs, values)  #  0.21 (0.8*0 + 0.19*1 + 0.01*2)
