@@ -1,49 +1,56 @@
-from torch import nn
-from torch.utils.data import DataLoader, TensorDataset
-from sklearn.model_selection import train_test_split
-import tqdm
-import torch
+import argparse
+from data import get_data_sl, get_data_cl
+from model import train_model, compute_ead
+from utils import set_seed
 
-from data import get_data_sl
 
-X, y = get_data_sl(environment="train", model_name="dino", outcome="sum")
-X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+def get_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--path_data_dir", type=str, default="./data/", help="Path to the data directory")
+    parser.add_argument("--batch_size", type=int, default=1024, help="Batch size")
+    parser.add_argument("--num_epochs", type=int, default=10, help="Number of epochs")
+    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
+    parser.add_argument("--model_name", type=str, default="dino", help="Model name")
+    parser.add_argument("--outcome", type=str, default="sum", help="Outcome")
+    parser.add_argument("--num_proc", type=int, default=4, help="Number of processes")
+    parser.add_argument("--environment", type=str, default="train", help="Environment")
+    parser.add_argument("--test_size", type=float, default=0.2, help="Test size")
+    parser.add_argument("--verbose", type=bool, default=True, help="Verbose")
+    parser.add_argument("--seed", type=int, default=42, help="Seed")
 
-train_dataset = TensorDataset(X_train, y_train)
-val_dataset = TensorDataset(X_val, y_val)
+    return parser
 
-train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
-model = nn.Sequential(
-    nn.Linear(X.shape[1], 100),
-    nn.ReLU(),
-    nn.Linear(100, 3)
-)
+def main(args):
+    set_seed(args.seed)
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = model.to(device)
-criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    print("Loading data")
+    X, y = get_data_sl(environment=args.environment, 
+                       model_name=args.model_name, 
+                       outcome=args.outcome)
+    
+    print("Training Model")
+    model = train_model(X, y, 
+                        test_size=args.test_size, 
+                        batch_size=args.batch_size, 
+                        num_epochs=args.num_epochs, 
+                        lr=args.lr, 
+                        verbose=args.verbose)
 
-for epoch in range(10):
-    print(f"Epoch {epoch}")
-    model.train()
-    train_loss = 0
-    train_acc = 0
-    for X_batch, y_batch in tqdm(train_loader):
-        X_batch.to(device)
-        y_batch.to(device)
-        optimizer.zero_grad()
-        y_pred = model(X_batch)
-        loss = criterion(y_pred, y_batch)
-        loss.backward()
-        optimizer.step()
-        train_loss += loss.item()
-        train_acc += (y_pred.argmax(dim=1) == y_batch).sum().item()
-    print(f"  Train: Loss={train_loss / len(train_loader)}, Accuracy={train_acc / len(X_train)}")
-    model.eval()
-    with torch.no_grad():
-        val_loss = sum(criterion(model(X_batch), y_batch) for X_batch, y_batch in val_loader) / len(val_loader)
-        val_acc = sum((model(X_batch).argmax(dim=1) == y_batch).sum().item() for X_batch, y_batch in val_loader) / len(X_val)
-    print(f"  Val:   Loss={val_loss}, Accuracy={val_acc}")
+    print("ATE Estimation")
+    X, y, t = get_data_cl(environment=args.environment, 
+                          model_name=args.model_name, 
+                          outcome=args.outcome)
+    ate = compute_ead(y, t)
+    ate_ml = compute_ead(model(X).sigmoid(), t)
+    # ate_cl = compute_ate(y, t, X) TODO
+    print(f"ATE (GT): {ate}")
+    print(f"ATE (ML): {ate_ml}")
+    # print(f"ATE (CL): {ate_cl}") TODO
+
+if __name__ == "__main__":
+    args = get_parser().parse_args()
+    main(args)
+    
+
+
