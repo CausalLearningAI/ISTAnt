@@ -4,7 +4,7 @@ import cv2
 import os
 from datasets import Dataset
 
-def get_data_cl(environment="train", data_dir="./data/", outcome="all"):
+def get_data_cl(environment="supervised", data_dir="./data/", outcome="all"):
     data = load_data(environment=environment, path_dir=data_dir, generate=False)
     X = None
     t = data["treatment"]
@@ -20,7 +20,7 @@ def get_data_cl(environment="train", data_dir="./data/", outcome="all"):
         raise ValueError(f"Outcome {outcome} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
     return X, y, t
 
-def get_examples(environment="train", data_dir="./data/", idxs=[600], outcome="all", model_name="dino"):
+def get_examples(environment="supervised", data_dir="./data/", idxs=[600], outcome="all", model_name="dino"):
     data = load_data(environment=environment, path_dir=data_dir, generate=False)
     image = data[idxs]["image"]
     if outcome=="all":
@@ -39,7 +39,7 @@ def get_examples(environment="train", data_dir="./data/", idxs=[600], outcome="a
     return image, y, embedding
 
     
-def get_data_sl(environment="train", model_name="vit", data_dir="./data/", outcome="all"):
+def get_data_sl(environment="supervised", model_name="vit", data_dir="./data/", outcome="all"):
     data = load_data(environment=environment, path_dir=data_dir, generate=False)
     embedding = Dataset.load_from_disk(f'{data_dir}{model_name}/{environment}')
     X = embedding[model_name]
@@ -55,7 +55,7 @@ def get_data_sl(environment="train", model_name="vit", data_dir="./data/", outco
         raise ValueError(f"Outcome {outcome} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
     return X, y 
 
-def load_data(environment='train', path_dir="./data/", generate=False, reduce_fps_factor=10, downscale_factor=0.4):
+def load_data(environment='supervised', path_dir="./data/", generate=False, reduce_fps_factor=10, downscale_factor=0.4):
     if generate:
         dataset = Dataset.from_generator(generator, gen_kwargs={"reduce_fps_factor": reduce_fps_factor, "downscale_factor": downscale_factor, "environment":environment})
         dataset.save_to_disk(path_dir+environment)
@@ -68,11 +68,11 @@ def load_data(environment='train', path_dir="./data/", generate=False, reduce_fp
         dataset.set_format(type="torch", columns=["image", "treatment", "outcome"], output_all_columns=True)
     return dataset
 
-def generator(reduce_fps_factor, downscale_factor, environment='train'):
-    if environment == 'train':
+def generator(reduce_fps_factor, downscale_factor, environment='supervised'):
+    if environment == 'supervised':
         start_frame_column = 'Starting Frame'
         end_frame_column = 'End Frame Annotation'
-    elif environment == 'test':
+    elif environment == 'unsupervised':
         start_frame_column = 'End Frame Annotation'
         end_frame_column = 'Valid until frame'
     else:
@@ -87,6 +87,11 @@ def generator(reduce_fps_factor, downscale_factor, environment='train'):
             start_frame = int(settings[settings.Experiment == f'{exp}{pos}'][start_frame_column].values[0]/reduce_fps_factor)
             end_frame = int(settings[settings.Experiment == f'{exp}{pos}'][end_frame_column].values[0]/reduce_fps_factor)
             treatment = settings[settings.Experiment == f'{exp}{pos}']['Treatment'].values[0].astype(int)
+            fps = settings[settings.Experiment == f'{exp}{pos}']["Frame Rate (FPS)"].values[0].astype(int)/reduce_fps_factor
+            day_hour = settings[settings.Experiment == f'{exp}{pos}']["Hour"].values[0]
+            pos_x = settings[settings.Experiment == f'{exp}{pos}']["Position X"].values[0]
+            pos_y = settings[settings.Experiment == f'{exp}{pos}']["Position X"].values[0]
+
             # load file .mkv
             frames = load_frames(exp, pos, 
                                  reduce_fps_factor=reduce_fps_factor, 
@@ -101,11 +106,15 @@ def generator(reduce_fps_factor, downscale_factor, environment='train'):
             for i in range(end_frame-start_frame):
                 yield {
                     "experiment": exp,
-                    "position": pos,
+                    'position': pos,                         
+                    "pos_x": pos_x, # covariate                          
+                    "pos_y": pos_y, # covariate   
                     "frame": i,
                     "image": frames[i],
                     "treatment": treatment,
                     "outcome": labels[i,:],
+                    "exp_minute": ((start_frame+i)/fps)//60, # covariate   
+                    "day_hour": day_hour, # covariate   
                 }
 
 def map_behaviour_to_label(behaviour):
@@ -149,9 +158,12 @@ def load_frames(exp, pos, reduce_fps_factor, downscale_factor, start_frame, end_
         # Frame rate reduction
         if frame_count % reduce_fps_factor == 0:
             # Downscaling
-            resized_frame = cv2.resize(frame, (0, 0), fx=downscale_factor, fy=downscale_factor)
+            if downscale_factor<1:
+                resized_frame = cv2.resize(frame, (0, 0), fx=downscale_factor, fy=downscale_factor)
+            else: 
+                resized_frame = frame
             # Convert to PyTorch tensor
-            tensor_frame = torch.from_numpy(resized_frame).permute(2, 0, 1)  
+            tensor_frame = torch.from_numpy(resized_frame).permute(2, 0, 1)[[2, 1, 0], :, :]
             frames.append(tensor_frame)
         frame_count += 1
 
