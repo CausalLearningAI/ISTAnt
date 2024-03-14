@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from data import get_example
+from data import get_examples
 import os
 
 def visualize_examples(idxs, outcome, model_name, model, save=True, path_results_dir="./results/"):
@@ -11,20 +11,21 @@ def visualize_examples(idxs, outcome, model_name, model, save=True, path_results
     rows = n//6 + 1
     fig = plt.figure(figsize=(13, rows*2.7))
     ax = []
-    for i, idx in enumerate(idxs):
-        img, y, emb = get_example(environment="train", 
-                                    idx=idx, 
-                                    outcome=outcome, 
-                                    model_name=model_name)
-        y_pred = model.pred(emb)
+    imgs, ys, embs = get_examples(environment="train", 
+                                  idxs=idxs, 
+                                  outcome=outcome, 
+                                  model_name=model_name)
+    for i, (img, y, emb) in enumerate(zip(imgs, ys, embs)):
+        y_pred = [int(elem.item()) for elem in model.pred(emb)]
+        y = [int(elem.item()) for elem in y]
         plt.rc('font', size=8)
         ax.append(fig.add_subplot(rows, columns, i + 1))
-        ax[-1].set_title(f"Outcome: {y}, Pred: {y_pred}")
-        plt.imshow(img)
+        ax[-1].set_title(f"H: {y}, ML: {y_pred}")
+        plt.imshow(img.permute(1, 2, 0))
     if save: 
         if not os.path.exists(path_results_dir):
             os.makedirs(path_results_dir)
-        plt.savefig(f"path_results_dir+", bbox_inches='tight')
+        plt.savefig(f"{path_results_dir}example_predictions", bbox_inches='tight')
     plt.show()
 
 def plot_outcome_distribution(data, save=False, total=True):
