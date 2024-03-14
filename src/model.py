@@ -27,7 +27,7 @@ def get_model(model_name, device="cpu"):
     return processor, model
 
 
-def add_embeddings(data, model_name, batch_size=100, num_proc=4, environment="train"):
+def add_embeddings(data, model_name, batch_size=100, num_proc=4, environment="supervised"):
     subfolders = [f.name for f in os.scandir("./data") if f.is_dir()]
     if (model_name in subfolders):
         environments = [f.name for f in os.scandir(f"./data/{model_name}") if f.is_dir()]

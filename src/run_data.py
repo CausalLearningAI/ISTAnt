@@ -6,12 +6,12 @@ import argparse
 def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--path_data_dir", type=str, default="./data/", help="Path to the data directory")
-    parser.add_argument("--batch_size", type=int, default=10, help="Batch size")
-    parser.add_argument("--num_proc", type=int, default=4, help="Number of processes")
-    parser.add_argument("--environment", type=str, default="train", help="Environment")
+    parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
+    parser.add_argument("--num_proc", type=int, default=5, help="Number of processes")
+    parser.add_argument("--environment", type=str, default="supervised", help="Environment")
     parser.add_argument("--generate", type=bool, default=False, help="Generate the dataset")
-    parser.add_argument("--reduce_fps_factor", type=int, default=10, help="Reduce fps factor")
-    parser.add_argument("--downscale_factor", type=float, default=0.4, help="Downscale factor")
+    parser.add_argument("--reduce_fps_factor", type=int, default=15, help="Reduce fps factor")
+    parser.add_argument("--downscale_factor", type=float, default=1, help="Downscale factor")
     return parser
 
 

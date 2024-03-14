@@ -9,9 +9,9 @@ def visualize_examples(idxs, outcome, model_name, model, save=True, path_results
     else:
         columns = 6   
     rows = n//6 + 1
-    fig = plt.figure(figsize=(13, rows*2.7))
+    fig = plt.figure(figsize=(15, rows*2.7))
     ax = []
-    imgs, ys, embs = get_examples(environment="train", 
+    imgs, ys, embs = get_examples(environment="supervised", 
                                   idxs=idxs, 
                                   outcome=outcome, 
                                   model_name=model_name)
