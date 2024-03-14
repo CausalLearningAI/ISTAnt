@@ -79,15 +79,12 @@ class MLP(nn.Module):
         self.model = nn.Sequential(
                             nn.Linear(input_size, hidden_size),
                             nn.ReLU(),
-                            nn.Linear(hidden_size, output_size) 
+                            nn.Linear(hidden_size, output_size),
+                            nn.Sigmoid()
                         )
     def forward(self, X):
-        return self.model(X) # [9, 7, -5]
+        return self.model(X) # [0.8, 0.4]
     def probs(self, X):
-        return nn.functional.softmax(self.model(X), dim=1) # [0.8, 0.19, 0.01]
+        return self.model(X) # [0.8, 0.4]
     def pred(self, X):
-        return self.model(X).argmax(dim=1).float() # 0.0
-    def cond_exp(self, X):
-        values = torch.tensor(range(self.output_size)).float() 
-        probs = self.probs(X)
-        return torch.matmul(probs, values)  #  0.21 (0.8*0 + 0.19*1 + 0.01*2)
+        return self.model(X).round() # [1, 0]

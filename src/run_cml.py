@@ -13,10 +13,10 @@ def get_parser():
     parser.add_argument("--path_data_dir", type=str, default="./data/", help="Path to the data directory")
     parser.add_argument("--path_results_dir", type=str, default="./results/", help="Path to the results directory")
     parser.add_argument("--batch_size", type=int, default=256, help="Batch size")
-    parser.add_argument("--num_epochs", type=int, default=2, help="Number of epochs")
-    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
+    parser.add_argument("--num_epochs", type=int, default=20, help="Number of epochs")
+    parser.add_argument("--lr", type=float, default=0.01, help="Learning rate")
     parser.add_argument("--model_name", type=str, default="dino", help="Model name")
-    parser.add_argument("--outcome", type=str, default="yellow", help="Outcome")
+    parser.add_argument("--outcome", type=str, default="all", help="Outcome")
     parser.add_argument("--num_proc", type=int, default=4, help="Number of processes")
     parser.add_argument("--environment", type=str, default="train", help="Environment")
     parser.add_argument("--test_size", type=float, default=0.2, help="Test size")
@@ -42,8 +42,8 @@ def main(args):
                         num_epochs=args.num_epochs, 
                         lr=args.lr, 
                         verbose=args.verbose)
+    y_probs = model.probs(X)
     y_pred = model.pred(X)
-    y_cond_exp = model.cond_exp(X)
 
     # get 36 integeres at random in [0,len(y)] with torch
     idxs = torch.randint(0, len(y), (36,))
@@ -61,7 +61,7 @@ def main(args):
     print(f"ATE (GT)")
     ate_B, ate_inf = compute_ead(y, t, verbose=args.verbose)
     print(f"ATE (ML)")
-    ate_ml_B, ate_ml_inf = compute_ead(y_cond_exp, t, verbose=args.verbose)
+    ate_ml_B, ate_ml_inf = compute_ead(y_probs, t, verbose=args.verbose)
     print(f"ATE (ML disc.)")
     ate_ml_d_B, ate_ml_d_inf = compute_ead(y_pred, t, verbose=args.verbose)
     #print(f"ATE (CL)")
