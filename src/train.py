@@ -7,15 +7,12 @@ from tqdm import tqdm
 from model import MLP
 
 
-def train_model(X, y, test_size=0.2, random_state=42, batch_size=1024, num_epochs=20, lr=0.0001, verbose=True):
+def train_model(X, y, split, batch_size=1024, num_epochs=20, lr=0.0001, verbose=True):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
 
-    X_train, X_val, y_train, y_val = train_test_split(X, y, 
-                                                      test_size=test_size, 
-                                                      random_state=random_state,
-                                                      shuffle=False)
-
+    X_train, y_train = X[split], y[split]
+    X_val, y_val = X[~split], y[~split]
     train_loader = DataLoader(TensorDataset(X_train, y_train), batch_size=batch_size, shuffle=True)
 
     input_size = X.shape[1]
