@@ -3,10 +3,12 @@ import pandas as pd
 import cv2
 import os
 from datasets import Dataset
+import string
 
 def get_data_cl(environment="supervised", data_dir="./data", task="all"):
     data = load_data(environment=environment, data_dir=data_dir, generate=False)
-    X = None
+    covariates = ['pos_x', 'pos_y', 'exp_minute', 'day_hour']
+    X = torch.stack([torch.tensor(data[covariate]) for covariate in covariates], dim=1)
     t = data["treatment"]
     if task=="all":
         y = data["outcome"]
@@ -46,7 +48,7 @@ def get_examples(environment="supervised", data_dir="./data", n=36, task="all", 
     return image, y, embedding
 
     
-def get_data_sl(environment="supervised", encoder_name="vit", data_dir="./data/", task="all"):
+def get_data_sl(environment="supervised", encoder_name="vit", data_dir="./data/", task="all", split_criteria="experiment"):
     data = load_data(environment=environment, data_dir=data_dir, generate=False)
     data_emb_env_dir = os.path.join(data_dir, encoder_name, environment)
     embedding = Dataset.load_from_disk(data_emb_env_dir)
@@ -61,19 +63,25 @@ def get_data_sl(environment="supervised", encoder_name="vit", data_dir="./data/"
         y = data["outcome"].sum(axis=1)
     else:
         raise ValueError(f"Task {task} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
-    return X, y 
+    if split_criteria=="experiment":
+        split = (data["experiment"] == 0)
+    elif split_criteria=="position":
+        split = (data["position"] == 0)
+    else:
+        raise ValueError(f"Split criteria {split_criteria} doesn't exist. Please select a valid splitting criteria: 'experiment', 'position'.")
+    return X, y, split
 
 def load_data(environment='supervised', data_dir="./data", generate=False, reduce_fps_factor=10, downscale_factor=0.4):
     data_env_dir = os.path.join(data_dir, environment)
     if generate:
         dataset = Dataset.from_generator(generator, gen_kwargs={"reduce_fps_factor": reduce_fps_factor, "downscale_factor": downscale_factor, "environment":environment, "data_dir":data_dir})
         dataset.save_to_disk(data_env_dir)
-        dataset.set_format(type="torch", columns=["image", "treatment", "outcome"], output_all_columns=True)
+        dataset.set_format(type="torch", columns=["image", "treatment", "outcome", 'pos_x', 'pos_y', 'exp_minute', 'day_hour', 'frame', "experiment", "position"], output_all_columns=True)
     else:
         if not os.path.exists(data_env_dir):
             raise Exception("The dataset is not saved, please set generate=True to generate the dataset, or correct the path_dir.")
         dataset = Dataset.load_from_disk(data_env_dir)
-        dataset.set_format(type="torch", columns=["image", "treatment", "outcome"], output_all_columns=True)
+        dataset.set_format(type="torch", columns=["image", "treatment", "outcome", 'pos_x', 'pos_y', 'exp_minute', 'day_hour', 'frame', "experiment", "position"], output_all_columns=True)
     return dataset
 
 def generator(reduce_fps_factor, downscale_factor, environment='supervised', data_dir="./data"):
@@ -86,7 +94,7 @@ def generator(reduce_fps_factor, downscale_factor, environment='supervised', dat
     else:
         raise ValueError(f'Unknown environment: {environment}')
     settings = pd.read_csv(f'{data_dir}/experiments_settings.csv')
-    for exp in ["a", "b", "c", "d", "e"]:
+    for id_exp, exp in enumerate(["a", "b", "c", "d", "e"]):
         print(f"Loading experiment {exp}")
         for pos in range(1, 10):
             print(f"Loading position {pos}")
@@ -114,7 +122,7 @@ def generator(reduce_fps_factor, downscale_factor, environment='supervised', dat
                                  end_frame=end_frame)
             for i in range(end_frame-start_frame):
                 yield {
-                    "experiment": exp,
+                    "experiment": id_exp,
                     'position': pos,                         
                     "pos_x": pos_x, # covariate                          
                     "pos_y": pos_y, # covariate   
