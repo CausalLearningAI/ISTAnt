@@ -14,7 +14,7 @@ def get_parser():
     parser.add_argument("--num_epochs", type=int, default=20, help="Number of epochs")
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
     parser.add_argument("--encoder_name", type=str, default="vit", help="Model name")
-    parser.add_argument("--outcome", type=str, default="all", help="Outcome")
+    parser.add_argument("--task", type=str, default="all", help="Outcome type")
     parser.add_argument("--num_proc", type=int, default=4, help="Number of processes")
     parser.add_argument("--environment", type=str, default="supervised", help="Environment")
     parser.add_argument("--test_size", type=float, default=0.2, help="Test size")
@@ -32,7 +32,7 @@ def main(args):
     X, y = get_data_sl(environment=args.environment, 
                        encoder_name=args.encoder_name, 
                        data_dir=args.data_dir,
-                       outcome=args.outcome)
+                       task=args.task)
     
     print("Training Model")
     model = train_model(X, y, 
@@ -45,7 +45,7 @@ def main(args):
     y_pred = model.pred(X)
 
     visualize_examples(n=args.n_examples, 
-                       outcome=args.outcome, 
+                       task=args.task, 
                        encoder_name=args.encoder_name, 
                        model=model, 
                        save=True, 
@@ -55,7 +55,7 @@ def main(args):
     print("ATE Estimation")
     X, y, t = get_data_cl(environment=args.environment, 
                           data_dir=args.data_dir,
-                          outcome=args.outcome)
+                          task=args.task)
     print(f"ATE (GT)")
     ate_B, ate_inf = compute_ead(y, t, verbose=args.verbose)
     print(f"ATE (ML)")
