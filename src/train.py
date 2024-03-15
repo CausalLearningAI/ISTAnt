@@ -9,6 +9,7 @@ from model import MLP
 
 def train_model(X, y, test_size=0.2, random_state=42, batch_size=1024, num_epochs=20, lr=0.0001, verbose=True):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Device: {device}")
 
     X_train, X_val, y_train, y_val = train_test_split(X, y, 
                                                       test_size=test_size, 
@@ -23,7 +24,7 @@ def train_model(X, y, test_size=0.2, random_state=42, batch_size=1024, num_epoch
 
     model = MLP(input_size, hidden_size, output_size).to(device)
     BCE = torch.nn.BCELoss()
-    CE = torch.nn.CrossEntropyLoss()
+    #CE = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     for epoch in range(num_epochs):
@@ -35,7 +36,7 @@ def train_model(X, y, test_size=0.2, random_state=42, batch_size=1024, num_epoch
             y_batch.to(device)
             optimizer.zero_grad()
             y_pred = model(X_batch)
-            loss = BCE(y_pred, y_batch) + CE(y_pred.sum(dim=1), y_batch.sum(dim=1))
+            loss = BCE(y_pred, y_batch) 
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
