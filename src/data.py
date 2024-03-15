@@ -4,62 +4,63 @@ import cv2
 import os
 from datasets import Dataset
 
-def get_data_cl(environment="supervised", data_dir="./data", outcome="all"):
+def get_data_cl(environment="supervised", data_dir="./data", task="all"):
     data = load_data(environment=environment, data_dir=data_dir, generate=False)
     X = None
     t = data["treatment"]
-    if outcome=="all":
+    if task=="all":
         y = data["outcome"]
-    elif outcome.lower()=="yellow":
+    elif task.lower()=="yellow":
         y = data["outcome"][:,0]
-    elif outcome.lower()=="blue":
+    elif task.lower()=="blue":
         y = data["outcome"][:,1]
-    elif outcome.lower()=="sum":
+    elif task.lower()=="sum":
         y = data["outcome"].sum(axis=1)
     else:
-        raise ValueError(f"Outcome {outcome} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
+        raise ValueError(f"Task {task} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
     return X, y, t
 
-def get_examples(environment="supervised", data_dir="./data", n=36, outcome="all", model_name="dino"):
+def get_examples(environment="supervised", data_dir="./data", n=36, task="all", encoder_name="dino"):
     data = load_data(environment=environment, data_dir=data_dir, generate=False)
     idxs = torch.randint(0, len(data), (n,))
     image = data[idxs]["image"]
     if environment=="supervised":
-        if outcome=="all":
+        if task=="all":
             y = data[idxs]["outcome"]
-        elif outcome.lower()=="yellow":
+        elif task.lower()=="yellow":
             y = data[idxs]["outcome"][:,0]
-        elif outcome.lower()=="blue":
+        elif task.lower()=="blue":
             y = data[idxs]["outcome"][:,1]
-        elif outcome.lower()=="sum":
+        elif task.lower()=="sum":
             y = data[idxs]["outcome"].sum()
         else:
-            raise ValueError(f"Outcome {outcome} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
+            raise ValueError(f"Task {task} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
     else:
         y = None
     del data
-    data_emb_env_dir = os.path.join(data_dir, model_name, environment)
+    data_emb_env_dir = os.path.join(data_dir, encoder_name, environment)
     if not os.path.exists(data_emb_env_dir):
-        raise Exception(f"`Embedding` {model_name} has not been extracted yet for `environment` {environment}, or just doesn't exist. Please select `model_name` and `environment` with valid embeddings extracted.")
+        raise Exception(f"`Embedding` {encoder_name} has not been extracted yet for `environment` {environment}, or just doesn't exist. Please select `encoder_name` and `environment` with valid embeddings extracted.")
     embeddings = Dataset.load_from_disk(data_emb_env_dir)
-    embedding = embeddings[idxs][model_name]
+    embedding = embeddings[idxs][encoder_name]
     return image, y, embedding
 
     
-def get_data_sl(environment="supervised", model_name="vit", data_dir="./data/", outcome="all"):
+def get_data_sl(environment="supervised", encoder_name="vit", data_dir="./data/", task="all"):
     data = load_data(environment=environment, data_dir=data_dir, generate=False)
-    embedding = Dataset.load_from_disk(f'{data_dir}{model_name}/{environment}')
-    X = embedding[model_name]
-    if outcome=="all":
+    data_emb_env_dir = os.path.join(data_dir, encoder_name, environment)
+    embedding = Dataset.load_from_disk(data_emb_env_dir)
+    X = embedding[encoder_name]
+    if task=="all":
         y = data["outcome"]
-    elif outcome.lower()=="yellow":
+    elif task.lower()=="yellow":
         y = data["outcome"][:,0]
-    elif outcome.lower()=="blue":
+    elif task.lower()=="blue":
         y = data["outcome"][:,1]
-    elif outcome.lower()=="sum":
+    elif task.lower()=="sum":
         y = data["outcome"].sum(axis=1)
     else:
-        raise ValueError(f"Outcome {outcome} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
+        raise ValueError(f"Task {task} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
     return X, y 
 
 def load_data(environment='supervised', data_dir="./data", generate=False, reduce_fps_factor=10, downscale_factor=0.4):

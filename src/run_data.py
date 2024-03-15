@@ -1,5 +1,5 @@
 from data import load_data
-from model import add_embeddings
+from model import get_embeddings
 import argparse
 
 
@@ -25,17 +25,17 @@ def main(args):
     )
     print("Data generated")
 
-    models = ["vit", "dino", "clip"]
-    for model in models:
-        data = add_embeddings(
-                data,
-                model,
-                environment=args.environment,
-                batch_size=args.batch_size,
-                num_proc=args.num_proc,
-                data_dir=args.data_dir,
-            )
-        print(f"Embedding ({model}) added")
+    encoder_names = ["vit", "dino", "clip"]
+    for encoder_name in encoder_names:
+        get_embeddings(
+            data,
+            encoder_name,
+            environment=args.environment,
+            batch_size=args.batch_size,
+            num_proc=args.num_proc,
+            data_dir=args.data_dir,
+        ) 
+        print(f"Embedding ({encoder_name}) added")
 
 
 if __name__ == "__main__":

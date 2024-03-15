@@ -3,7 +3,7 @@ import torch
 from data import get_examples
 import os
 
-def visualize_examples(n, model_name, model, outcome="all", environment="supervised", save=True, data_dir="./data", results_dir="./results"):
+def visualize_examples(n, encoder_name, model, outcome="all", environment="supervised", save=True, data_dir="./data", results_dir="./results"):
     if n < 6:
         columns = n
     else:
@@ -14,7 +14,7 @@ def visualize_examples(n, model_name, model, outcome="all", environment="supervi
     imgs, ys, embs = get_examples(environment=environment, 
                                   n=n, 
                                   outcome=outcome, 
-                                  model_name=model_name,
+                                  encoder_name=encoder_name,
                                   data_dir=data_dir)
     if environment=="supervised":
         for i, (img, y, emb) in enumerate(zip(imgs, ys, embs)):

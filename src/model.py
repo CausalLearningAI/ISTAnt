@@ -9,36 +9,38 @@ from datasets import Dataset
 from tqdm import tqdm
 import os
 
-def get_model(model_name, device="cpu"):
-    if model_name == "dino":
+def get_model(encoder_name, device="cpu"):
+    if encoder_name == "dino":
         processor = AutoImageProcessor.from_pretrained('facebook/dinov2-base')
         model = AutoModel.from_pretrained('facebook/dinov2-base').to(device)
-    elif model_name == "vit":
+    elif encoder_name == "vit":
         processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224')
         model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224').to(device)
-    elif model_name == "resnet":
+    elif encoder_name == "resnet":
         processor = AutoImageProcessor.from_pretrained("microsoft/resnet-50")
         model = ResNetForImageClassification.from_pretrained("microsoft/resnet-50").to(device)
-    elif model_name == "clip":
+    elif encoder_name == "clip":
         processor = AutoProcessor.from_pretrained("openai/clip-vit-base-patch32")        
         model = CLIPVisionModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
     else:
-        raise ValueError(f"Model name: {model_name} is not implemented.")
+        raise ValueError(f"Encoder name: {encoder_name} is not implemented.")
     return processor, model
 
 
-def add_embeddings(data, model_name, batch_size=100, num_proc=4, environment="supervised", data_dir="./data"):
-    data_emb_dir = os.path.join(data_dir, model_name)
+def get_embeddings(data, encoder_name, batch_size=100, num_proc=4, environment="supervised", data_dir="./data"):
+    data_emb_dir = os.path.join(data_dir, encoder_name)
     subfolders = [f.name for f in os.scandir(data_dir) if f.is_dir()]
-    if (model_name in subfolders):
+    if (encoder_name in subfolders):
         environments = [f.name for f in os.scandir(data_emb_dir) if f.is_dir()]
         if (environment in environments):
-            print(f"Embedding {model_name} already extracted.")
-            return data
+            print(f"Embeddings from encoder {encoder_name} already extracted.")
+            data_emb_env_dir = os.path.join(data_emb_dir, environment)
+            embedding = Dataset.load_from_disk(data_emb_env_dir)
+            return embedding
         
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
-    processor, model = get_model(model_name, device)
+    processor, model = get_model(encoder_name, device)
     model.eval().requires_grad_(False)
     # data = data.map(lambda x: {"emb1": encoder(x["image"], model, processor, device)}, batch_size=batch_size, batched=True, num_proc=num_proc)
     
@@ -54,26 +56,26 @@ def add_embeddings(data, model_name, batch_size=100, num_proc=4, environment="su
         embedding = encoder(batch["image"], model, processor, device)
         embeddings.append(embedding)
     embeddings = torch.cat(embeddings, 0)
-    embeddings = Dataset.from_dict({model_name: embeddings.tolist()})
-    embeddings.set_format(type="torch", columns=[model_name])
+    embeddings = Dataset.from_dict({encoder_name: embeddings.tolist()})
+    embeddings.set_format(type="torch", columns=[encoder_name])
     if not os.path.exists(data_emb_dir):
             os.makedirs(data_emb_dir)
     data_emb_env_dir = os.path.join(data_emb_dir, environment)
     embeddings.save_to_disk(data_emb_env_dir)
         
-    return data
+    return embeddings
 
 
 def encoder(x, model, processor, device):
     inputs = processor(images=x, return_tensors="pt").to(device)
     outputs = model(**inputs, output_hidden_states=True)
-    model_name_full = model.config._name_or_path
-    if ("vit" in model_name_full) or ("dino" in model_name_full):
+    encoder_name_full = model.config._name_or_path
+    if ("vit" in encoder_name_full) or ("dino" in encoder_name_full):
         emb = outputs.hidden_states[-1][:, 0]
-    elif ("resnet" in model_name_full):
+    elif ("resnet" in encoder_name_full):
         emb = outputs.hidden_states[-1].mean(dim=[2,3])
     else:
-        raise ValueError(f"Unkown model class: {model_name_full}")
+        raise ValueError(f"Unkown model class: {encoder_name_full}")
     return emb.to("cpu")
 
 class MLP(nn.Module):

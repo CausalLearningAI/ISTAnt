@@ -5,8 +5,6 @@ from causal import compute_ead
 from utils import set_seed
 from visualize import visualize_examples
 
-import torch
-
 
 def get_parser():
     parser = argparse.ArgumentParser()
@@ -15,7 +13,7 @@ def get_parser():
     parser.add_argument("--batch_size", type=int, default=256, help="Batch size")
     parser.add_argument("--num_epochs", type=int, default=20, help="Number of epochs")
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
-    parser.add_argument("--model_name", type=str, default="vit", help="Model name")
+    parser.add_argument("--encoder_name", type=str, default="vit", help="Model name")
     parser.add_argument("--outcome", type=str, default="all", help="Outcome")
     parser.add_argument("--num_proc", type=int, default=4, help="Number of processes")
     parser.add_argument("--environment", type=str, default="supervised", help="Environment")
@@ -32,7 +30,7 @@ def main(args):
 
     print("Loading data")
     X, y = get_data_sl(environment=args.environment, 
-                       model_name=args.model_name, 
+                       encoder_name=args.encoder_name, 
                        data_dir=args.data_dir,
                        outcome=args.outcome)
     
@@ -48,7 +46,7 @@ def main(args):
 
     visualize_examples(n=args.n_examples, 
                        outcome=args.outcome, 
-                       model_name=args.model_name, 
+                       encoder_name=args.encoder_name, 
                        model=model, 
                        save=True, 
                        data_dir=args.data_dir,
