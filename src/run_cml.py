@@ -41,8 +41,8 @@ def main(args):
                         num_epochs=args.num_epochs, 
                         lr=args.lr, 
                         verbose=args.verbose)
-    y_probs = model.probs(X)
-    y_pred = model.pred(X)
+    y_probs = model.probs(X.to(model.device)).to("cpu")
+    y_pred = model.pred(X.to(model.device)).to("cpu")
 
     visualize_examples(n=args.n_examples, 
                        task=args.task, 
