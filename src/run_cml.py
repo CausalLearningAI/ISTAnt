@@ -22,6 +22,7 @@ def get_parser():
     parser.add_argument("--test_size", type=float, default=0.2, help="Test size")
     parser.add_argument("--verbose", type=bool, default=True, help="Verbose")
     parser.add_argument("--seed", type=int, default=42, help="Seed")
+    parser.add_argument("--n_examples", type=int, default=36, help="Number of examples used for visualization.")    
 
     return parser
 
@@ -45,9 +46,7 @@ def main(args):
     y_probs = model.probs(X)
     y_pred = model.pred(X)
 
-    # get 36 integeres at random in [0,len(y)] with torch
-    idxs = torch.randint(0, len(y), (36,))
-    visualize_examples(idxs, 
+    visualize_examples(n=args.n_examples, 
                        outcome=args.outcome, 
                        model_name=args.model_name, 
                        model=model, 

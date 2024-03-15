@@ -1,9 +1,9 @@
 import matplotlib.pyplot as plt
+import torch
 from data import get_examples
 import os
 
-def visualize_examples(idxs, outcome, model_name, model, save=True, data_dir="./data", results_dir="./results"):
-    n = len(idxs)
+def visualize_examples(n, model_name, model, outcome="all", environment="supervised", save=True, data_dir="./data", results_dir="./results"):
     if n < 6:
         columns = n
     else:
@@ -11,22 +11,32 @@ def visualize_examples(idxs, outcome, model_name, model, save=True, data_dir="./
     rows = n//6 + 1
     fig = plt.figure(figsize=(15, rows*2.7))
     ax = []
-    imgs, ys, embs = get_examples(environment="supervised", 
-                                  idxs=idxs, 
+    imgs, ys, embs = get_examples(environment=environment, 
+                                  n=n, 
                                   outcome=outcome, 
                                   model_name=model_name,
                                   data_dir=data_dir)
-    for i, (img, y, emb) in enumerate(zip(imgs, ys, embs)):
-        y_pred = [int(elem.item()) for elem in model.pred(emb)]
-        y = [int(elem.item()) for elem in y]
-        plt.rc('font', size=8)
-        ax.append(fig.add_subplot(rows, columns, i + 1))
-        ax[-1].set_title(f"H: {y}, ML: {y_pred}")
-        plt.imshow(img.permute(1, 2, 0))
+    if environment=="supervised":
+        for i, (img, y, emb) in enumerate(zip(imgs, ys, embs)):
+            y_pred = [int(elem.item()) for elem in model.pred(emb)]
+            y = [int(elem.item()) for elem in y]
+            plt.rc('font', size=8)
+            ax.append(fig.add_subplot(rows, columns, i + 1))
+            ax[-1].set_title(f"H: {y}, ML: {y_pred}")
+            plt.imshow(img.permute(1, 2, 0))
+    elif environment=="unsupervised":
+        for i, (img, emb) in enumerate(zip(imgs, embs)):
+            y_pred = [int(elem.item()) for elem in model.pred(emb)]
+            plt.rc('font', size=8)
+            ax.append(fig.add_subplot(rows, columns, i + 1))
+            ax[-1].set_title(f"ML: {y_pred}")
+            plt.imshow(img.permute(1, 2, 0))
+    else:
+        raise ValueError(f"Environment {environment} not defined.")
     if save: 
         if not os.path.exists(results_dir):
             os.makedirs(results_dir)
-        title = "example_predictions.png"
+        title = f"example_{environment}_predictions.png"
         path_fig = os.path.join(results_dir, title)
         plt.savefig(path_fig, bbox_inches='tight')
     else:

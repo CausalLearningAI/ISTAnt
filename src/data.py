@@ -20,19 +20,23 @@ def get_data_cl(environment="supervised", data_dir="./data", outcome="all"):
         raise ValueError(f"Outcome {outcome} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
     return X, y, t
 
-def get_examples(environment="supervised", data_dir="./data", idxs=[600], outcome="all", model_name="dino"):
+def get_examples(environment="supervised", data_dir="./data", n=36, outcome="all", model_name="dino"):
     data = load_data(environment=environment, data_dir=data_dir, generate=False)
+    idxs = torch.randint(0, len(data), (n,))
     image = data[idxs]["image"]
-    if outcome=="all":
-        y = data[idxs]["outcome"]
-    elif outcome.lower()=="yellow":
-        y = data[idxs]["outcome"][:,0]
-    elif outcome.lower()=="blue":
-        y = data[idxs]["outcome"][:,1]
-    elif outcome.lower()=="sum":
-        y = data[idxs]["outcome"].sum()
+    if environment=="supervised":
+        if outcome=="all":
+            y = data[idxs]["outcome"]
+        elif outcome.lower()=="yellow":
+            y = data[idxs]["outcome"][:,0]
+        elif outcome.lower()=="blue":
+            y = data[idxs]["outcome"][:,1]
+        elif outcome.lower()=="sum":
+            y = data[idxs]["outcome"].sum()
+        else:
+            raise ValueError(f"Outcome {outcome} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
     else:
-        raise ValueError(f"Outcome {outcome} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
+        y = None
     del data
     data_emb_env_dir = os.path.join(data_dir, model_name, environment)
     if not os.path.exists(data_emb_env_dir):
@@ -65,7 +69,6 @@ def load_data(environment='supervised', data_dir="./data", generate=False, reduc
         dataset.save_to_disk(data_env_dir)
         dataset.set_format(type="torch", columns=["image", "treatment", "outcome"], output_all_columns=True)
     else:
-        # check if the dataset is already saved
         if not os.path.exists(data_env_dir):
             raise Exception("The dataset is not saved, please set generate=True to generate the dataset, or correct the path_dir.")
         dataset = Dataset.load_from_disk(data_env_dir)
