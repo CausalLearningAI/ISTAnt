@@ -3,7 +3,6 @@ import pandas as pd
 import cv2
 import os
 from datasets import Dataset
-import string
 
 def get_data_cl(environment="supervised", data_dir="./data", task="all"):
     data = load_data(environment=environment, data_dir=data_dir, generate=False)
@@ -162,7 +161,7 @@ def load_labels(exp, pos, reduce_fps_factor, start_frame, end_frame):
 
 def load_frames(exp, pos, reduce_fps_factor, downscale_factor, start_frame, end_frame, data_dir="./data"):
     video_name = f'{exp}{pos}.mkv'
-    video_path = os.path.join(data_dir, video_name)
+    video_path = os.path.join(data_dir, "video", video_name)
     cap = cv2.VideoCapture(video_path)
     #original_fps = cap.get(cv2.CAP_PROP_FPS)
 
