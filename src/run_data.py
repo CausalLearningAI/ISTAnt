@@ -5,7 +5,7 @@ import argparse
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--path_data_dir", type=str, default="./data/", help="Path to the data directory")
+    parser.add_argument("--data_dir", type=str, default="./data", help="Path to the data directory")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
     parser.add_argument("--num_proc", type=int, default=5, help="Number of processes")
     parser.add_argument("--environment", type=str, default="supervised", help="Environment")
@@ -18,7 +18,7 @@ def get_parser():
 def main(args):
     data = load_data(
         environment=args.environment,
-        path_dir=args.path_data_dir,
+        data_dir=args.data_dir,
         generate=args.generate,
         reduce_fps_factor=args.reduce_fps_factor,
         downscale_factor=args.downscale_factor,
@@ -33,6 +33,7 @@ def main(args):
                 environment=args.environment,
                 batch_size=args.batch_size,
                 num_proc=args.num_proc,
+                data_dir=args.data_dir,
             )
         print(f"Embedding ({model}) added")
 

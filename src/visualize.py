@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 from data import get_examples
 import os
 
-def visualize_examples(idxs, outcome, model_name, model, save=True, path_results_dir="./results/"):
+def visualize_examples(idxs, outcome, model_name, model, save=True, data_dir="./data", results_dir="./results"):
     n = len(idxs)
     if n < 6:
         columns = n
@@ -14,7 +14,8 @@ def visualize_examples(idxs, outcome, model_name, model, save=True, path_results
     imgs, ys, embs = get_examples(environment="supervised", 
                                   idxs=idxs, 
                                   outcome=outcome, 
-                                  model_name=model_name)
+                                  model_name=model_name,
+                                  data_dir=data_dir)
     for i, (img, y, emb) in enumerate(zip(imgs, ys, embs)):
         y_pred = [int(elem.item()) for elem in model.pred(emb)]
         y = [int(elem.item()) for elem in y]
@@ -23,12 +24,15 @@ def visualize_examples(idxs, outcome, model_name, model, save=True, path_results
         ax[-1].set_title(f"H: {y}, ML: {y_pred}")
         plt.imshow(img.permute(1, 2, 0))
     if save: 
-        if not os.path.exists(path_results_dir):
-            os.makedirs(path_results_dir)
-        plt.savefig(f"{path_results_dir}example_predictions", bbox_inches='tight')
-    plt.show()
+        if not os.path.exists(results_dir):
+            os.makedirs(results_dir)
+        title = "example_predictions.png"
+        path_fig = os.path.join(results_dir, title)
+        plt.savefig(path_fig, bbox_inches='tight')
+    else:
+        plt.show()
 
-def plot_outcome_distribution(data, save=False, total=True):
+def plot_outcome_distribution(data, save=False, total=True, results_dir="./results"):
     T = data['treatment']
     Y = data['outcome']
     fig, axs = plt.subplots(1, 2+total, figsize=(12+6*total, 5))
@@ -68,8 +72,10 @@ def plot_outcome_distribution(data, save=False, total=True):
         axs[2].legend()
         axs[2].set_title(f'Grooming (total)')
     if save:
-        if not os.path.exists('results'):
-            os.makedirs('results')
-        fig.savefig('results/outcome_distribution.png')
+        if not os.path.exists(results_dir):
+            os.makedirs(results_dir)
+        title = "outcome_distribution.png"
+        path_fig = os.path.join(results_dir, title)
+        fig.savefig(path_fig)
     else:
         plt.show();

@@ -27,10 +27,11 @@ def get_model(model_name, device="cpu"):
     return processor, model
 
 
-def add_embeddings(data, model_name, batch_size=100, num_proc=4, environment="supervised"):
-    subfolders = [f.name for f in os.scandir("./data") if f.is_dir()]
+def add_embeddings(data, model_name, batch_size=100, num_proc=4, environment="supervised", data_dir="./data"):
+    data_emb_dir = os.path.join(data_dir, model_name)
+    subfolders = [f.name for f in os.scandir(data_dir) if f.is_dir()]
     if (model_name in subfolders):
-        environments = [f.name for f in os.scandir(f"./data/{model_name}") if f.is_dir()]
+        environments = [f.name for f in os.scandir(data_emb_dir) if f.is_dir()]
         if (environment in environments):
             print(f"Embedding {model_name} already extracted.")
             return data
@@ -55,7 +56,10 @@ def add_embeddings(data, model_name, batch_size=100, num_proc=4, environment="su
     embeddings = torch.cat(embeddings, 0)
     embeddings = Dataset.from_dict({model_name: embeddings.tolist()})
     embeddings.set_format(type="torch", columns=[model_name])
-    embeddings.save_to_disk(f"./data/{model_name}/{environment}")
+    if not os.path.exists(data_emb_dir):
+            os.makedirs(data_emb_dir)
+    data_emb_env_dir = os.path.join(data_emb_dir, environment)
+    embeddings.save_to_disk(data_emb_env_dir)
         
     return data
 

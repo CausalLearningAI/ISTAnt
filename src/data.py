@@ -4,8 +4,8 @@ import cv2
 import os
 from datasets import Dataset
 
-def get_data_cl(environment="supervised", data_dir="./data/", outcome="all"):
-    data = load_data(environment=environment, path_dir=data_dir, generate=False)
+def get_data_cl(environment="supervised", data_dir="./data", outcome="all"):
+    data = load_data(environment=environment, data_dir=data_dir, generate=False)
     X = None
     t = data["treatment"]
     if outcome=="all":
@@ -20,8 +20,8 @@ def get_data_cl(environment="supervised", data_dir="./data/", outcome="all"):
         raise ValueError(f"Outcome {outcome} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
     return X, y, t
 
-def get_examples(environment="supervised", data_dir="./data/", idxs=[600], outcome="all", model_name="dino"):
-    data = load_data(environment=environment, path_dir=data_dir, generate=False)
+def get_examples(environment="supervised", data_dir="./data", idxs=[600], outcome="all", model_name="dino"):
+    data = load_data(environment=environment, data_dir=data_dir, generate=False)
     image = data[idxs]["image"]
     if outcome=="all":
         y = data[idxs]["outcome"]
@@ -34,13 +34,16 @@ def get_examples(environment="supervised", data_dir="./data/", idxs=[600], outco
     else:
         raise ValueError(f"Outcome {outcome} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
     del data
-    embeddings = Dataset.load_from_disk(f'{data_dir}{model_name}/{environment}')
+    data_emb_env_dir = os.path.join(data_dir, model_name, environment)
+    if not os.path.exists(data_emb_env_dir):
+        raise Exception(f"`Embedding` {model_name} has not been extracted yet for `environment` {environment}, or just doesn't exist. Please select `model_name` and `environment` with valid embeddings extracted.")
+    embeddings = Dataset.load_from_disk(data_emb_env_dir)
     embedding = embeddings[idxs][model_name]
     return image, y, embedding
 
     
 def get_data_sl(environment="supervised", model_name="vit", data_dir="./data/", outcome="all"):
-    data = load_data(environment=environment, path_dir=data_dir, generate=False)
+    data = load_data(environment=environment, data_dir=data_dir, generate=False)
     embedding = Dataset.load_from_disk(f'{data_dir}{model_name}/{environment}')
     X = embedding[model_name]
     if outcome=="all":
@@ -55,20 +58,21 @@ def get_data_sl(environment="supervised", model_name="vit", data_dir="./data/", 
         raise ValueError(f"Outcome {outcome} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
     return X, y 
 
-def load_data(environment='supervised', path_dir="./data/", generate=False, reduce_fps_factor=10, downscale_factor=0.4):
+def load_data(environment='supervised', data_dir="./data", generate=False, reduce_fps_factor=10, downscale_factor=0.4):
+    data_env_dir = os.path.join(data_dir, environment)
     if generate:
-        dataset = Dataset.from_generator(generator, gen_kwargs={"reduce_fps_factor": reduce_fps_factor, "downscale_factor": downscale_factor, "environment":environment})
-        dataset.save_to_disk(path_dir+environment)
+        dataset = Dataset.from_generator(generator, gen_kwargs={"reduce_fps_factor": reduce_fps_factor, "downscale_factor": downscale_factor, "environment":environment, "data_dir":data_dir})
+        dataset.save_to_disk(data_env_dir)
         dataset.set_format(type="torch", columns=["image", "treatment", "outcome"], output_all_columns=True)
     else:
         # check if the dataset is already saved
-        if not os.path.exists(path_dir+environment):
+        if not os.path.exists(data_env_dir):
             raise Exception("The dataset is not saved, please set generate=True to generate the dataset, or correct the path_dir.")
-        dataset = Dataset.load_from_disk(path_dir+environment)
+        dataset = Dataset.load_from_disk(data_env_dir)
         dataset.set_format(type="torch", columns=["image", "treatment", "outcome"], output_all_columns=True)
     return dataset
 
-def generator(reduce_fps_factor, downscale_factor, environment='supervised'):
+def generator(reduce_fps_factor, downscale_factor, environment='supervised', data_dir="./data"):
     if environment == 'supervised':
         start_frame_column = 'Starting Frame'
         end_frame_column = 'End Frame Annotation'
@@ -77,7 +81,7 @@ def generator(reduce_fps_factor, downscale_factor, environment='supervised'):
         end_frame_column = 'Valid until frame'
     else:
         raise ValueError(f'Unknown environment: {environment}')
-    settings = pd.read_csv(f'./data/experiments_settings.csv')
+    settings = pd.read_csv(f'{data_dir}/experiments_settings.csv')
     for exp in ["a", "b", "c", "d", "e"]:
         print(f"Loading experiment {exp}")
         for pos in range(1, 10):
@@ -90,7 +94,7 @@ def generator(reduce_fps_factor, downscale_factor, environment='supervised'):
             fps = settings[settings.Experiment == f'{exp}{pos}']["Frame Rate (FPS)"].values[0].astype(int)/reduce_fps_factor
             day_hour = settings[settings.Experiment == f'{exp}{pos}']["Hour"].values[0]
             pos_x = settings[settings.Experiment == f'{exp}{pos}']["Position X"].values[0]
-            pos_y = settings[settings.Experiment == f'{exp}{pos}']["Position X"].values[0]
+            pos_y = settings[settings.Experiment == f'{exp}{pos}']["Position Y"].values[0]
 
             # load file .mkv
             frames = load_frames(exp, pos, 

@@ -10,8 +10,8 @@ import torch
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--path_data_dir", type=str, default="./data/", help="Path to the data directory")
-    parser.add_argument("--path_results_dir", type=str, default="./results/", help="Path to the results directory")
+    parser.add_argument("--data_dir", type=str, default="./data", help="Path to the data directory")
+    parser.add_argument("--results_dir", type=str, default="./results", help="Path to the results directory")
     parser.add_argument("--batch_size", type=int, default=256, help="Batch size")
     parser.add_argument("--num_epochs", type=int, default=20, help="Number of epochs")
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
@@ -32,7 +32,7 @@ def main(args):
     print("Loading data")
     X, y = get_data_sl(environment=args.environment, 
                        model_name=args.model_name, 
-                       data_dir=args.path_data_dir,
+                       data_dir=args.data_dir,
                        outcome=args.outcome)
     
     print("Training Model")
@@ -52,11 +52,12 @@ def main(args):
                        model_name=args.model_name, 
                        model=model, 
                        save=True, 
-                       path_results_dir="./results/")
+                       data_dir=args.data_dir,
+                       results_dir=args.results_dir)
 
     print("ATE Estimation")
     X, y, t = get_data_cl(environment=args.environment, 
-                          data_dir=args.path_data_dir,
+                          data_dir=args.data_dir,
                           outcome=args.outcome)
     print(f"ATE (GT)")
     ate_B, ate_inf = compute_ead(y, t, verbose=args.verbose)
