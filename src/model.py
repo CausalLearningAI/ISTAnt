@@ -2,6 +2,8 @@ from transformers import ViTImageProcessor, ViTForImageClassification
 from transformers import AutoImageProcessor, ResNetForImageClassification
 from transformers import AutoImageProcessor, AutoModel
 from transformers import AutoProcessor, CLIPVisionModel
+from transformers import AutoImageProcessor, ViTMAEModel
+from transformers import SiglipImageProcessor, SiglipVisionModel
 from torch.utils.data import DataLoader
 import torch
 from torch import nn
@@ -16,12 +18,21 @@ def get_model(encoder_name, device="cpu"):
     elif encoder_name == "vit":
         processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224')
         model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224').to(device)
+    elif encoder_name == "vit_large":
+        processor = SiglipImageProcessor.from_pretrained('google/siglip-base-patch16-512')
+        model = SiglipVisionModel.from_pretrained('google/siglip-base-patch16-512').to(device)
     elif encoder_name == "resnet":
         processor = AutoImageProcessor.from_pretrained("microsoft/resnet-50")
         model = ResNetForImageClassification.from_pretrained("microsoft/resnet-50").to(device)
     elif encoder_name == "clip":
         processor = AutoProcessor.from_pretrained("openai/clip-vit-base-patch32")        
         model = CLIPVisionModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
+    elif encoder_name == "clip_large":
+        processor = AutoProcessor.from_pretrained('openai/clip-vit-large-patch14-336')
+        model = CLIPVisionModel.from_pretrained('openai/clip-vit-large-patch14-336').to(device)
+    elif encoder_name == "mae":
+        processor = AutoImageProcessor.from_pretrained('facebook/vit-mae-large')
+        model = ViTMAEModel.from_pretrained('facebook/vit-mae-large')
     else:
         raise ValueError(f"Encoder name: {encoder_name} is not implemented.")
     return processor, model

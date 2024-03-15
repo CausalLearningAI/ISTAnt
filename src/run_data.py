@@ -25,7 +25,7 @@ def main(args):
     )
     print("Data generated")
 
-    encoder_names = ["vit", "dino", "clip"]
+    encoder_names = ["vit", "dino", "clip", "vit_large", "clip_large", "mae"]
     for encoder_name in encoder_names:
         get_embeddings(
             data,
