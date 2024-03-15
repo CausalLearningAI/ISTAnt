@@ -105,7 +105,8 @@ def generator(reduce_fps_factor, downscale_factor, environment='supervised', dat
                                  reduce_fps_factor=reduce_fps_factor, 
                                  downscale_factor=downscale_factor, 
                                  start_frame=start_frame, 
-                                 end_frame=end_frame)
+                                 end_frame=end_frame,
+                                 data_dir=data_dir)
             # load annotations
             labels = load_labels(exp, pos, 
                                  reduce_fps_factor=reduce_fps_factor,
@@ -151,8 +152,9 @@ def load_labels(exp, pos, reduce_fps_factor, start_frame, end_frame):
             labels.append(label_frame(i*reduce_fps_factor, behaviors))
         return torch.tensor(labels, dtype=torch.float32)
 
-def load_frames(exp, pos, reduce_fps_factor, downscale_factor, start_frame, end_frame):
-    video_path = f'./data/video/{exp}{pos}.mkv'
+def load_frames(exp, pos, reduce_fps_factor, downscale_factor, start_frame, end_frame, data_dir="./data"):
+    video_name = f'{exp}{pos}.mkv'
+    video_path = os.path.join(data_dir, video_name)
     cap = cv2.VideoCapture(video_path)
     #original_fps = cap.get(cv2.CAP_PROP_FPS)
 
@@ -170,7 +172,7 @@ def load_frames(exp, pos, reduce_fps_factor, downscale_factor, start_frame, end_
                 resized_frame = cv2.resize(frame, (0, 0), fx=downscale_factor, fy=downscale_factor)
             else: 
                 resized_frame = frame
-            # Convert to PyTorch tensor
+            # Convert to PyTorch tensor (RGB)
             tensor_frame = torch.from_numpy(resized_frame).permute(2, 0, 1)[[2, 1, 0], :, :]
             frames.append(tensor_frame)
         frame_count += 1
