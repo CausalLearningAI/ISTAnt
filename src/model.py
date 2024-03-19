@@ -95,7 +95,9 @@ class MLP(nn.Module):
         super().__init__()
         self.output_size = output_size
         self.model = nn.Sequential(
-                            nn.Linear(input_size, hidden_size),
+                            nn.Linear(input_size, 2*hidden_size),
+                            nn.ReLU(),
+                            nn.Linear(2*hidden_size, hidden_size),
                             nn.ReLU(),
                             nn.Linear(hidden_size, output_size),
                             nn.Sigmoid()
