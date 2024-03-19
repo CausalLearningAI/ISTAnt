@@ -10,56 +10,29 @@ def get_data_cl(environment="supervised", data_dir="./data", task="all"):
     covariates = ['pos_x', 'pos_y', 'exp_minute', 'day_hour']
     X = torch.stack([data[covariate] for covariate in covariates], dim=1)
     t = data["treatment"]
-    if task=="all":
-        y = data["outcome"]
-    elif task.lower()=="yellow":
-        y = data["outcome"][:,0]
-    elif task.lower()=="blue":
-        y = data["outcome"][:,1]
-    elif task.lower()=="sum":
-        y = data["outcome"].sum(axis=1)
-    else:
-        raise ValueError(f"Task {task} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
+    y = get_outcome(data, task)
     return X, y, t
 
-def get_examples(environment="supervised", data_dir="./data", n=36, task="all", encoder_name="dino"):
+def get_examples(environment="supervised", data_dir="./data", n=36, task="all", encoder_name="dino", token="class"):
     data = load_data(environment=environment, data_dir=data_dir, generate=False)
     idxs = torch.randint(0, len(data), (n,))
     image = data[idxs]["image"]
     if environment=="supervised":
-        if task=="all":
-            y = data[idxs]["outcome"]
-        elif task.lower()=="yellow":
-            y = data[idxs]["outcome"][:,0]
-        elif task.lower()=="blue":
-            y = data[idxs]["outcome"][:,1]
-        elif task.lower()=="sum":
-            y = data[idxs]["outcome"].sum()
-        else:
-            raise ValueError(f"Task {task} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
+        y = get_outcome(data[idxs], task)
     else:
         y = None
     del data
-    data_emb_env_dir = os.path.join(data_dir, encoder_name, environment)
-    if not os.path.exists(data_emb_env_dir):
-        raise Exception(f"`Embedding` {encoder_name} has not been extracted yet for `environment` {environment}, or just doesn't exist. Please select `encoder_name` and `environment` with valid embeddings extracted.")
-    embeddings = Dataset.load_from_disk(data_emb_env_dir)
-    embedding = embeddings[idxs][encoder_name]
-    return image, y, embedding
-
-    
-def get_data_sl(environment="supervised", encoder_name="dino", data_dir="./data/", task="all", split_criteria="experiment", token="class"):
-    data = load_data(environment=environment, data_dir=data_dir, generate=False)
     tokens = ["class", "mean"]
     if token in tokens:
-        embedding = get_embeddings(data, encoder_name, environment=environment, data_dir=data_dir, token=token, verbose=False)
-        X = embedding[encoder_name]
+        embeddings = get_embeddings(data, encoder_name, environment=environment, data_dir=data_dir, token=token, verbose=False)[idxs]
+        embeddings = embeddings[encoder_name]
     elif token=="all":
-        embedding_class = get_embeddings(data, encoder_name, environment=environment, data_dir=data_dir, token=tokens[0], verbose=False)
-        embedding_mean = get_embeddings(data, encoder_name, environment=environment, data_dir=data_dir, token=tokens[1], verbose=False)
-        X = torch.cat((embedding_class[encoder_name], embedding_mean[encoder_name]), dim=1)
-    else:
-        raise ValueError("Token criteria not recognized. Please select between: 'class', 'mean', 'all'.")
+        embeddings_class = get_embeddings(data, encoder_name, environment=environment, data_dir=data_dir, token=tokens[0], verbose=False)[idxs]
+        embeddings_mean = get_embeddings(data, encoder_name, environment=environment, data_dir=data_dir, token=tokens[1], verbose=False)[idxs]
+        embeddings = torch.cat((embeddings_class[encoder_name], embeddings_mean[encoder_name]), dim=1)
+    return image, y, embeddings
+
+def get_outcome(data, task):
     if task=="all":
         y = data["outcome"]
     elif task.lower()=="yellow":
@@ -68,8 +41,25 @@ def get_data_sl(environment="supervised", encoder_name="dino", data_dir="./data/
         y = data["outcome"][:,1]
     elif task.lower()=="sum":
         y = data["outcome"].sum(axis=1)
+    elif task.lower()=="or":
+        y = torch.logical_or(data["outcome"][:,0], data["outcome"][:,1]).float()
     else:
-        raise ValueError(f"Task {task} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
+        raise ValueError(f"Task {task} not defined. Please select between: 'all', 'yellow', 'blue', 'sum', 'or'.")
+    return y
+
+def get_data_sl(environment="supervised", encoder_name="dino", data_dir="./data/", task="all", split_criteria="experiment", token="class"):
+    data = load_data(environment=environment, data_dir=data_dir, generate=False)
+    tokens = ["class", "mean"]
+    if token in tokens:
+        embeddings = get_embeddings(data, encoder_name, environment=environment, data_dir=data_dir, token=token, verbose=False)
+        X = embeddings[encoder_name]
+    elif token=="all":
+        embeddings_class = get_embeddings(data, encoder_name, environment=environment, data_dir=data_dir, token=tokens[0], verbose=False)
+        embeddings_mean = get_embeddings(data, encoder_name, environment=environment, data_dir=data_dir, token=tokens[1], verbose=False)
+        X = torch.cat((embeddings_class[encoder_name], embeddings_mean[encoder_name]), dim=1)
+    else:
+        raise ValueError("Token criteria not recognized. Please select between: 'class', 'mean', 'all'.")
+    y = get_outcome(data, task)
     if split_criteria=="experiment":
         split = (data["experiment"] == 0)
     elif split_criteria=="experiment_easy":
