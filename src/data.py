@@ -3,11 +3,12 @@ import pandas as pd
 import cv2
 import os
 from datasets import Dataset
+from model import get_embeddings
 
 def get_data_cl(environment="supervised", data_dir="./data", task="all"):
     data = load_data(environment=environment, data_dir=data_dir, generate=False)
     covariates = ['pos_x', 'pos_y', 'exp_minute', 'day_hour']
-    X = torch.stack([torch.tensor(data[covariate]) for covariate in covariates], dim=1)
+    X = torch.stack([data[covariate] for covariate in covariates], dim=1)
     t = data["treatment"]
     if task=="all":
         y = data["outcome"]
@@ -47,11 +48,18 @@ def get_examples(environment="supervised", data_dir="./data", n=36, task="all", 
     return image, y, embedding
 
     
-def get_data_sl(environment="supervised", encoder_name="vit", data_dir="./data/", task="all", split_criteria="experiment"):
+def get_data_sl(environment="supervised", encoder_name="dino", data_dir="./data/", task="all", split_criteria="experiment", token="class"):
     data = load_data(environment=environment, data_dir=data_dir, generate=False)
-    data_emb_env_dir = os.path.join(data_dir, encoder_name, environment)
-    embedding = Dataset.load_from_disk(data_emb_env_dir)
-    X = embedding[encoder_name]
+    tokens = ["class", "mean"]
+    if token in tokens:
+        embedding = get_embeddings(data, encoder_name, environment=environment, data_dir=data_dir, token=token, verbose=False)
+        X = embedding[encoder_name]
+    elif token=="all":
+        embedding_class = get_embeddings(data, encoder_name, environment=environment, data_dir=data_dir, token=tokens[0], verbose=False)
+        embedding_mean = get_embeddings(data, encoder_name, environment=environment, data_dir=data_dir, token=tokens[1], verbose=False)
+        X = torch.cat((embedding_class[encoder_name], embedding_mean[encoder_name]), dim=1)
+    else:
+        raise ValueError("Token criteria not recognized. Please select between: 'class', 'mean', 'all'.")
     if task=="all":
         y = data["outcome"]
     elif task.lower()=="yellow":
@@ -64,23 +72,27 @@ def get_data_sl(environment="supervised", encoder_name="vit", data_dir="./data/"
         raise ValueError(f"Task {task} not defined. Please select between: 'all', 'yellow', 'blue', 'sum'.")
     if split_criteria=="experiment":
         split = (data["experiment"] == 0)
+    elif split_criteria=="experiment_easy":
+        split = (data["experiment"] != 4)
     elif split_criteria=="position":
         split = (data["position"] == 0)
+    elif split_criteria=="position_easy":
+        split = (data["position"] != 9)
     else:
         raise ValueError(f"Split criteria {split_criteria} doesn't exist. Please select a valid splitting criteria: 'experiment', 'position'.")
     return X, y, split
 
-def load_data(environment='supervised', data_dir="./data", generate=False, reduce_fps_factor=10, downscale_factor=0.4):
+def load_data(environment='supervised', data_dir="./data", generate=False, reduce_fps_factor=10, downscale_factor=0.4, verbose=False):
     data_env_dir = os.path.join(data_dir, environment)
     if generate:
         dataset = Dataset.from_generator(generator, gen_kwargs={"reduce_fps_factor": reduce_fps_factor, "downscale_factor": downscale_factor, "environment":environment, "data_dir":data_dir})
         dataset.save_to_disk(data_env_dir)
-        dataset.set_format(type="torch", columns=["image", "treatment", "outcome", 'pos_x', 'pos_y', 'exp_minute', 'day_hour', 'frame', "experiment", "position"], output_all_columns=True)
+        if verbose: print("Data generated and saved correctly.")
     else:
         if not os.path.exists(data_env_dir):
             raise Exception("The dataset is not saved, please set generate=True to generate the dataset, or correct the path_dir.")
         dataset = Dataset.load_from_disk(data_env_dir)
-        dataset.set_format(type="torch", columns=["image", "treatment", "outcome", 'pos_x', 'pos_y', 'exp_minute', 'day_hour', 'frame', "experiment", "position"], output_all_columns=True)
+    dataset.set_format(type="torch", columns=["image", "treatment", "outcome", 'pos_x', 'pos_y', 'exp_minute', 'day_hour', 'frame', "experiment", "position"], output_all_columns=True)
     return dataset
 
 def generator(reduce_fps_factor, downscale_factor, environment='supervised', data_dir="./data"):

@@ -12,6 +12,7 @@ def get_parser():
     parser.add_argument("--generate", type=bool, default=False, help="Generate the dataset")
     parser.add_argument("--reduce_fps_factor", type=int, default=15, help="Reduce fps factor")
     parser.add_argument("--downscale_factor", type=float, default=1, help="Downscale factor")
+    parser.add_argument("--verbose", type=bool, default=True, help="Verbose")
     return parser
 
 
@@ -22,20 +23,23 @@ def main(args):
         generate=args.generate,
         reduce_fps_factor=args.reduce_fps_factor,
         downscale_factor=args.downscale_factor,
+        verbose=args.verbose,
     )
-    print("Data generated")
 
     encoder_names = ["vit", "dino", "clip", "vit_large", "clip_large", "mae"]
+    tokens = ["class", "mean"]
     for encoder_name in encoder_names:
-        get_embeddings(
-            data,
-            encoder_name,
-            environment=args.environment,
-            batch_size=args.batch_size,
-            num_proc=args.num_proc,
-            data_dir=args.data_dir,
-        ) 
-        print(f"Embedding ({encoder_name}) added")
+        for token in tokens:
+            get_embeddings(
+                data,
+                encoder_name,
+                environment=args.environment,
+                batch_size=args.batch_size,
+                num_proc=args.num_proc,
+                data_dir=args.data_dir,
+                token=token,
+                verbose=args.verbose,
+            ) 
 
 
 if __name__ == "__main__":

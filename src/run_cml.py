@@ -11,7 +11,7 @@ def get_parser():
     parser.add_argument("--data_dir", type=str, default="./data", help="Path to the data directory")
     parser.add_argument("--results_dir", type=str, default="./results", help="Path to the results directory")
     parser.add_argument("--batch_size", type=int, default=256, help="Batch size")
-    parser.add_argument("--num_epochs", type=int, default=20, help="Number of epochs")
+    parser.add_argument("--num_epochs", type=int, default=3, help="Number of epochs")
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
     parser.add_argument("--encoder_name", type=str, default="dino", help="Model name")
     parser.add_argument("--task", type=str, default="all", help="Outcome type")
@@ -20,8 +20,9 @@ def get_parser():
     parser.add_argument("--test_size", type=float, default=0.2, help="Test size")
     parser.add_argument("--verbose", type=bool, default=True, help="Verbose")
     parser.add_argument("--seed", type=int, default=42, help="Seed")
-    parser.add_argument("--split_criteria", type=str, default="experiment", help="Splitting criteria")
-    parser.add_argument("--n_examples", type=int, default=36, help="Number of examples used for visualization.")    
+    parser.add_argument("--split_criteria", type=str, default="experiment_easy", help="Splitting criteria")
+    parser.add_argument("--n_examples", type=int, default=36, help="Number of examples used for visualization.")
+    parser.add_argument("--token", type=str, default="class", help="Token considered for embedding via ViT")    
 
     return parser
 
@@ -34,7 +35,8 @@ def main(args):
                               encoder_name=args.encoder_name, 
                               data_dir=args.data_dir,
                               task=args.task,
-                              split_criteria=args.split_criteria)
+                              split_criteria=args.split_criteria,
+                              token=args.token)
     
     print("Training Model")
     model = train_model(X, y,  

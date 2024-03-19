@@ -36,51 +36,54 @@ def get_model(encoder_name, device="cpu"):
     return processor, model
 
 
-def get_embeddings(data, encoder_name, batch_size=100, num_proc=4, environment="supervised", data_dir="./data"):
-    data_emb_dir = os.path.join(data_dir, encoder_name)
-    subfolders = [f.name for f in os.scandir(data_dir) if f.is_dir()]
-    if (encoder_name in subfolders):
+def get_embeddings(data, encoder_name, batch_size=100, num_proc=4, environment="supervised", data_dir="./data", token="class", verbose=True):
+    data_emb_dir = os.path.join(data_dir, "embeddings", token, encoder_name)
+    if os.path.exists(data_emb_dir):
         environments = [f.name for f in os.scandir(data_emb_dir) if f.is_dir()]
         if (environment in environments):
-            print(f"Embeddings from encoder {encoder_name} already extracted.")
+            if verbose: print(f"Embeddings from encoder '{encoder_name}' token '{token}' already extracted.")
             data_emb_env_dir = os.path.join(data_emb_dir, environment)
-            embedding = Dataset.load_from_disk(data_emb_env_dir)
-            return embedding
+            embeddings = Dataset.load_from_disk(data_emb_env_dir)
+    else:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Device: {device}")
+        processor, model = get_model(encoder_name, device)
+        model.eval().requires_grad_(False)
+        # data = data.map(lambda x: {"emb1": encoder(x["image"], model, processor, device)}, batch_size=batch_size, batched=True, num_proc=num_proc)
         
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
-    processor, model = get_model(encoder_name, device)
-    model.eval().requires_grad_(False)
-    # data = data.map(lambda x: {"emb1": encoder(x["image"], model, processor, device)}, batch_size=batch_size, batched=True, num_proc=num_proc)
-    
-    dataloader = DataLoader(
-        data,
-        batch_size=batch_size,
-        num_workers=num_proc,
-        pin_memory=True,
-        shuffle=False,
-    )
-    embeddings = []
-    for batch in tqdm(dataloader):
-        embedding = encoder(batch["image"], model, processor, device)
-        embeddings.append(embedding)
-    embeddings = torch.cat(embeddings, 0)
-    embeddings = Dataset.from_dict({encoder_name: embeddings.tolist()})
-    embeddings.set_format(type="torch", columns=[encoder_name])
-    if not os.path.exists(data_emb_dir):
-            os.makedirs(data_emb_dir)
-    data_emb_env_dir = os.path.join(data_emb_dir, environment)
-    embeddings.save_to_disk(data_emb_env_dir)
-        
+        dataloader = DataLoader(
+            data,
+            batch_size=batch_size,
+            num_workers=num_proc,
+            pin_memory=True,
+            shuffle=False,
+        )
+        embeddings = []
+        for batch in tqdm(dataloader):
+            embedding = encoder(batch["image"], model, processor, device, token)
+            embeddings.append(embedding)
+        embeddings = torch.cat(embeddings, 0)
+        embeddings = Dataset.from_dict({encoder_name: embeddings.tolist()})
+        embeddings.set_format(type="torch", columns=[encoder_name])
+        os.makedirs(data_emb_dir)
+        data_emb_env_dir = os.path.join(data_emb_dir, environment)
+        embeddings.save_to_disk(data_emb_env_dir)
+        if verbose: print(f"Embeddings from encoder '{encoder_name}' token '{token}' computed and saved correctly.")
+
     return embeddings
 
 
-def encoder(x, model, processor, device):
+def encoder(x, model, processor, device, token="class"):
     inputs = processor(images=x, return_tensors="pt").to(device)
     outputs = model(**inputs, output_hidden_states=True)
     encoder_name_full = model.config._name_or_path
     if ("vit" in encoder_name_full) or ("dino" in encoder_name_full) or ("siglip" in encoder_name_full):
-        emb = outputs.hidden_states[-1][:, 0]
+        if token=="class":
+            emb = outputs.hidden_states[-1][:, 0]
+        elif token=="mean":
+            emb = outputs.hidden_states[-1][:,1:].mean(dim=1)
+        else:
+            raise ValueError("Token criteria not recognized. Please select between: 'class', 'mean'.")
     elif ("resnet" in encoder_name_full):
         emb = outputs.hidden_states[-1].mean(dim=[2,3])
     else:
