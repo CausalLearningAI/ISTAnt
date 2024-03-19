@@ -1,13 +1,11 @@
-from transformers import ViTImageProcessor, ViTForImageClassification
-from transformers import AutoImageProcessor, ResNetForImageClassification
-from transformers import AutoImageProcessor, AutoModel
-from transformers import AutoProcessor, CLIPVisionModel
-from transformers import AutoImageProcessor, ViTMAEModel
-from transformers import SiglipImageProcessor, SiglipVisionModel
-from torch.utils.data import DataLoader
+from transformers import ViTImageProcessor, AutoImageProcessor, AutoProcessor, SiglipImageProcessor
+from transformers import ViTForImageClassification, ResNetForImageClassification, AutoModel, CLIPVisionModel, ViTMAEModel, SiglipVisionModel
+from datasets import Dataset
+
 import torch
 from torch import nn
-from datasets import Dataset
+from torch.utils.data import DataLoader
+
 from tqdm import tqdm
 import os
 
@@ -32,7 +30,7 @@ def get_model(encoder_name, device="cpu"):
         model = CLIPVisionModel.from_pretrained('openai/clip-vit-large-patch14-336').to(device)
     elif encoder_name == "mae":
         processor = AutoImageProcessor.from_pretrained('facebook/vit-mae-large')
-        model = ViTMAEModel.from_pretrained('facebook/vit-mae-large')
+        model = ViTMAEModel.from_pretrained('facebook/vit-mae-large').to(device)
     else:
         raise ValueError(f"Encoder name: {encoder_name} is not implemented.")
     return processor, model
@@ -81,7 +79,7 @@ def encoder(x, model, processor, device):
     inputs = processor(images=x, return_tensors="pt").to(device)
     outputs = model(**inputs, output_hidden_states=True)
     encoder_name_full = model.config._name_or_path
-    if ("vit" in encoder_name_full) or ("dino" in encoder_name_full):
+    if ("vit" in encoder_name_full) or ("dino" in encoder_name_full) or ("siglip" in encoder_name_full):
         emb = outputs.hidden_states[-1][:, 0]
     elif ("resnet" in encoder_name_full):
         emb = outputs.hidden_states[-1].mean(dim=[2,3])
