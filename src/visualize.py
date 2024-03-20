@@ -1,9 +1,8 @@
 import matplotlib.pyplot as plt
-import torch
 from data import get_examples
 import os
 
-def visualize_examples(n, encoder_name, model, task="all", environment="supervised", save=True, data_dir="./data", results_dir="./results"):
+def visualize_examples(n, encoder_name, model, task="all", environment="supervised", save=True, data_dir="./data", results_dir="./results", token="all"):
     if n < 6:
         columns = n
     else:
@@ -15,11 +14,12 @@ def visualize_examples(n, encoder_name, model, task="all", environment="supervis
                                   n=n, 
                                   task=task, 
                                   encoder_name=encoder_name,
-                                  data_dir=data_dir)
+                                  data_dir=data_dir,
+                                  token=token)
     if environment=="supervised":
         for i, (img, y, emb) in enumerate(zip(imgs, ys, embs)):
             y_pred = [int(elem.item()) for elem in model.to("cpu").pred(emb)]
-            y = [int(elem.item()) for elem in y]
+            y = [int(elem.item()) for elem in y.unsqueeze(-1)]
             plt.rc('font', size=8)
             ax.append(fig.add_subplot(rows, columns, i + 1))
             ax[-1].set_title(f"H: {y}, ML: {y_pred}")
@@ -34,10 +34,11 @@ def visualize_examples(n, encoder_name, model, task="all", environment="supervis
     else:
         raise ValueError(f"Environment {environment} not defined.")
     if save: 
-        if not os.path.exists(results_dir):
-            os.makedirs(results_dir)
-        title = f"example_{environment}_predictions.png"
-        path_fig = os.path.join(results_dir, title)
+        results_example_dir = os.path.join(results_dir, "example_pred")
+        if not os.path.exists(results_example_dir):
+            os.makedirs(results_example_dir)
+        title = f"{encoder_name}_{token}_task_{task}_env_{environment[:-7]}.png"
+        path_fig = os.path.join(results_example_dir, title)
         plt.savefig(path_fig, bbox_inches='tight')
     else:
         plt.show()
