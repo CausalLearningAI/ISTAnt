@@ -32,7 +32,7 @@ def main(args):
         print("Encoder: ", encoder)
         for token in tokens:
             print("Token: ", token)
-            if not os.path.exists(f".data/embeddings/{token}/{encoder}/{args.environment}"):
+            if not os.path.exists(f"./data/embeddings/{token}/{encoder}/{args.environment}"):
                 continue
             for task in tasks:
                 print("Task: ", task)
