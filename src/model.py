@@ -130,7 +130,7 @@ class MLP(nn.Module):
             return self.probs(X).round() # [1, 0]
     def cond_exp(self, X):
         if self.task=="sum":
-            values = torch.tensor(range(3)).float() 
+            values = torch.tensor(range(3)).float().to(self.device)
             probs = self.probs(X)
             return torch.matmul(probs, values) # [0.5]
         else:

@@ -36,7 +36,9 @@ def train_model(X, y, split, batch_size=1024, num_epochs=20, lr=0.0001, verbose=
         model.train()
         train_loss = 0
         for X_batch, y_batch in tqdm(train_loader):
-            X_batch, y_batch = X_batch.to(device), y_batch.to(device).long()
+            X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+            if y.task=="sum":
+                y_batch = y_batch.long()
             optimizer.zero_grad()
             y_pred = model(X_batch).squeeze()
             loss = loss_fn(y_pred, y_batch) 
@@ -61,29 +63,29 @@ def evaluate_model(model, X, y, device="cpu"):
             #accs.append((y_pred.sum(dim=1) == y.sum(dim=1)).float().mean(dim=0))
             TP = ((y == 1) & (y_pred == 1)).sum(dim=0)
             FP = ((y != 1) & (y_pred == 1)).sum(dim=0)
-            precisions = TP / (TP + FP)
+            precisions = [prec.item() for prec in (TP / (TP + FP))]
             FN = ((y == 1) & (y_pred != 1)).sum(dim=0)
-            recalls = TP / (TP + FN)
+            recalls = [rec.item() for rec in (TP / (TP + FN))]
         elif y.task in ["yellow", "blue", "or"]:
-            accs = (y_pred == y).float().mean(dim=0).item()
+            accs = [(y_pred == y).float().mean(dim=0).item()]
             TP = ((y == 1) & (y_pred == 1)).sum()
             #print("TP: ", TP.item())
             FP = ((y != 1) & (y_pred == 1)).sum()
             #print("FP: ", FP.item())
-            precisions = TP / (TP + FP)
+            precisions = [(TP / (TP + FP)).item()]
             FN = ((y == 1) & (y_pred != 1)).sum()
             #print("FN: ", FN.item())
-            recalls = TP / (TP + FN)
+            recalls = [(TP / (TP + FN)).item()]
         elif y.task=="sum":
-            accs = (y_pred == y).float().mean(dim=0)
+            accs = [(y_pred == y).float().mean(dim=0).item()]
             precisions = []
             recalls = []
             for i in range(3):
                 TP = ((y == i) & (y_pred == i)).sum()
                 FP = ((y != i) & (y_pred == i)).sum()
-                precisions.append(TP / (TP + FP))
+                precisions.append((TP / (TP + FP)).item())
                 FN = ((y == i) & (y_pred != i)).sum()
-                recalls.append(TP / (TP + FN))
+                recalls.append((TP / (TP + FN)).item())
     return accs, precisions, recalls
 
 def print_performances(accs, precisions, recalls, task, environment="train"):

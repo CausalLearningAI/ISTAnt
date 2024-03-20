@@ -18,7 +18,7 @@ def visualize_examples(n, encoder_name, model, task="all", environment="supervis
                                   token=token)
     if environment=="supervised":
         for i, (img, y, emb) in enumerate(zip(imgs, ys, embs)):
-            y_pred = [int(elem.item()) for elem in model.to("cpu").pred(emb)]
+            y_pred = [int(elem.item()) for elem in model.to("cpu").pred(emb).unsqueeze(-1)]
             y = [int(elem.item()) for elem in y.unsqueeze(-1)]
             plt.rc('font', size=8)
             ax.append(fig.add_subplot(rows, columns, i + 1))
@@ -26,7 +26,7 @@ def visualize_examples(n, encoder_name, model, task="all", environment="supervis
             plt.imshow(img.permute(1, 2, 0))
     elif environment=="unsupervised":
         for i, (img, emb) in enumerate(zip(imgs, embs)):
-            y_pred = [int(elem.item()) for elem in model.to("cpu").pred(emb)]
+            y_pred = [int(elem.item()) for elem in model.to("cpu").pred(emb).unsqueeze(-1)]
             plt.rc('font', size=8)
             ax.append(fig.add_subplot(rows, columns, i + 1))
             ax[-1].set_title(f"ML: {y_pred}")

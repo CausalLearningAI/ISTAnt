@@ -44,7 +44,7 @@ def main(args):
                         lr=args.lr, 
                         split=split,
                         verbose=args.verbose)
-    y_probs = model.probs(X.to(model.device)).to("cpu")
+    y_cond_exp = model.cond_exp(X.to(model.device)).to("cpu")
     y_pred = model.pred(X.to(model.device)).to("cpu")
 
     visualize_examples(n=args.n_examples, 
@@ -63,9 +63,9 @@ def main(args):
     print(f"ATE (GT)")
     ate_B, ate_inf = compute_ead(y, t, verbose=args.verbose)
     print(f"ATE (ML)")
-    ate_ml_B, ate_ml_inf = compute_ead(y_probs, t, verbose=args.verbose)
+    ate_ml_B, ate_ml_inf = compute_ead(y_cond_exp, t, verbose=args.verbose)
     print(f"ATE (ML disc.)")
-    ate_ml_d_B, ate_ml_d_inf = compute_ead(y_pred, t, verbose=args.verbose)
+    ate_ml_d_B, ate_ml_d_inf = compute_ead(y_pred.float(), t, verbose=args.verbose)
     #print(f"ATE (CL)")
     #ate_cl_B, ate_cl_inf = compute_ate(y, t, X) TODO
 
