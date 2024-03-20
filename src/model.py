@@ -44,32 +44,32 @@ def get_embeddings(data, encoder_name, batch_size=100, num_proc=4, environment="
             if verbose: print(f"Embeddings from encoder '{encoder_name}' token '{token}' already extracted.")
             data_emb_env_dir = os.path.join(data_emb_dir, environment)
             embeddings = Dataset.load_from_disk(data_emb_env_dir)
+            return embeddings
     else:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f"Device: {device}")
-        processor, model = get_model(encoder_name, device)
-        model.eval().requires_grad_(False)
-        # data = data.map(lambda x: {"emb1": encoder(x["image"], model, processor, device)}, batch_size=batch_size, batched=True, num_proc=num_proc)
-        
-        dataloader = DataLoader(
-            data,
-            batch_size=batch_size,
-            num_workers=num_proc,
-            pin_memory=True,
-            shuffle=False,
-        )
-        embeddings = []
-        for batch in tqdm(dataloader):
-            embedding = encoder(batch["image"], model, processor, device, token)
-            embeddings.append(embedding)
-        embeddings = torch.cat(embeddings, 0)
-        embeddings = Dataset.from_dict({encoder_name: embeddings.tolist()})
-        embeddings.set_format(type="torch", columns=[encoder_name])
         os.makedirs(data_emb_dir)
-        data_emb_env_dir = os.path.join(data_emb_dir, environment)
-        embeddings.save_to_disk(data_emb_env_dir)
-        if verbose: print(f"Embeddings from encoder '{encoder_name}' token '{token}' computed and saved correctly.")
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Device: {device}")
+    processor, model = get_model(encoder_name, device)
+    model.eval().requires_grad_(False)
+    # data = data.map(lambda x: {"emb1": encoder(x["image"], model, processor, device)}, batch_size=batch_size, batched=True, num_proc=num_proc)
+    dataloader = DataLoader(
+        data,
+        batch_size=batch_size,
+        num_workers=num_proc,
+        pin_memory=True,
+        shuffle=False,
+    )
+    embeddings = []
+    for batch in tqdm(dataloader):
+        embedding = encoder(batch["image"], model, processor, device, token)
+        embeddings.append(embedding)
+    embeddings = torch.cat(embeddings, 0)
+    embeddings = Dataset.from_dict({encoder_name: embeddings.tolist()})
+    embeddings.set_format(type="torch", columns=[encoder_name])
+    data_emb_env_dir = os.path.join(data_emb_dir, environment)
+    embeddings.save_to_disk(data_emb_env_dir)
+    if verbose: print(f"Embeddings from encoder '{encoder_name}' token '{token}' computed and saved correctly.")
     return embeddings
 
 
@@ -91,20 +91,49 @@ def encoder(x, model, processor, device, token="class"):
     return emb.to("cpu")
 
 class MLP(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self, input_size, hidden_size, task):
         super().__init__()
+        self.task = task
+        if task=="all":
+            output_size = 2
+        elif task=="sum":
+            output_size = 3
+        else:
+            output_size = 1
         self.output_size = output_size
         self.model = nn.Sequential(
                             nn.Linear(input_size, 2*hidden_size),
                             nn.ReLU(),
-                            nn.Linear(2*hidden_size, hidden_size),
-                            nn.ReLU(),
-                            nn.Linear(hidden_size, output_size),
-                            nn.Sigmoid()
+                            #nn.Linear(2*hidden_size, hidden_size),
+                            #nn.ReLU(),
+                            nn.Linear(2*hidden_size, output_size),
                         )
+        self.init_weights()
+        
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.constant_(m.bias, 0.0)
+
     def forward(self, X):
-        return self.model(X) # [0.8, 0.4]
+        return self.model(X) # [-1.8, 0.4]
     def probs(self, X):
-        return self.model(X) # [0.8, 0.4]
+        if self.task=="sum":
+            return self.model(X).softmax(dim=-1) # [0.7, 0.1, 0.2]
+        else:
+            return self.model(X).sigmoid() # [0.8, 0.4]
     def pred(self, X):
-        return self.model(X).round() # [1, 0]
+        if self.task=="sum":
+            return torch.argmax(self.model(X), dim=-1) # [0]
+        else:
+            return self.probs(X).round() # [1, 0]
+    def cond_exp(self, X):
+        if self.task=="sum":
+            values = torch.tensor(range(3)).float() 
+            probs = self.probs(X)
+            return torch.matmul(probs, values) # [0.5]
+        else:
+            return self.probs(X) # [0.8, 0.4]
+        
+    
