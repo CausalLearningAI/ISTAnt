@@ -17,7 +17,6 @@ def get_parser():
     parser.add_argument("--task", type=str, default="all", help="Outcome type")
     parser.add_argument("--num_proc", type=int, default=4, help="Number of processes")
     parser.add_argument("--environment", type=str, default="supervised", help="Environment")
-    parser.add_argument("--test_size", type=float, default=0.2, help="Test size")
     parser.add_argument("--verbose", type=bool, default=True, help="Verbose")
     parser.add_argument("--seed", type=int, default=42, help="Seed")
     parser.add_argument("--split_criteria", type=str, default="experiment_easy", help="Splitting criteria")
@@ -54,7 +53,8 @@ def main(args):
                        model=model, 
                        save=True, 
                        data_dir=args.data_dir,
-                       results_dir=args.results_dir)
+                       results_dir=args.results_dir,
+                       token=args.token)
 
     print("ATE Estimation")
     X, y, t = get_data_cl(environment=args.environment, 
