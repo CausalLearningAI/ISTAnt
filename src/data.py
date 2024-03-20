@@ -21,7 +21,6 @@ def get_examples(environment="supervised", data_dir="./data", n=36, task="all", 
         y = get_outcome(data[idxs], task)
     else:
         y = None
-    del data
     tokens = ["class", "mean"]
     if token in tokens:
         embeddings = get_embeddings(data, encoder_name, environment=environment, data_dir=data_dir, token=token, verbose=False)[idxs]
@@ -45,6 +44,7 @@ def get_outcome(data, task):
         y = torch.logical_or(data["outcome"][:,0], data["outcome"][:,1]).float()
     else:
         raise ValueError(f"Task {task} not defined. Please select between: 'all', 'yellow', 'blue', 'sum', 'or'.")
+    y.task = task
     return y
 
 def get_data_sl(environment="supervised", encoder_name="dino", data_dir="./data/", task="all", split_criteria="experiment", token="class"):
