@@ -1,40 +1,45 @@
 from data import load_data
-from model import add_embeddings
+from model import get_embeddings
 import argparse
 
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--path_data_dir", type=str, default="./data/", help="Path to the data directory")
-    parser.add_argument("--batch_size", type=int, default=10, help="Batch size")
-    parser.add_argument("--num_proc", type=int, default=4, help="Number of processes")
-    parser.add_argument("--environment", type=str, default="train", help="Environment")
+    parser.add_argument("--data_dir", type=str, default="./data", help="Path to the data directory")
+    parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
+    parser.add_argument("--num_proc", type=int, default=5, help="Number of processes")
+    parser.add_argument("--environment", type=str, default="supervised", help="Environment")
     parser.add_argument("--generate", type=bool, default=False, help="Generate the dataset")
-    parser.add_argument("--reduce_fps_factor", type=int, default=10, help="Reduce fps factor")
-    parser.add_argument("--downscale_factor", type=float, default=0.4, help="Downscale factor")
+    parser.add_argument("--reduce_fps_factor", type=int, default=15, help="Reduce fps factor")
+    parser.add_argument("--downscale_factor", type=float, default=1, help="Downscale factor")
+    parser.add_argument("--verbose", type=bool, default=True, help="Verbose")
     return parser
 
 
 def main(args):
     data = load_data(
         environment=args.environment,
-        path_dir=args.path_data_dir,
+        data_dir=args.data_dir,
         generate=args.generate,
         reduce_fps_factor=args.reduce_fps_factor,
         downscale_factor=args.downscale_factor,
+        verbose=args.verbose,
     )
-    print("Data generated")
 
-    models = ["vit", "dino", "clip"]
-    for model in models:
-        data = add_embeddings(
+    encoder_names = ["vit", "dino", "clip", "vit_large", "clip_large", "mae"]
+    tokens = ["class", "mean"]
+    for encoder_name in encoder_names:
+        for token in tokens:
+            get_embeddings(
                 data,
-                model,
+                encoder_name,
                 environment=args.environment,
                 batch_size=args.batch_size,
                 num_proc=args.num_proc,
-            )
-        print(f"Embedding ({model}) added")
+                data_dir=args.data_dir,
+                token=token,
+                verbose=args.verbose,
+            ) 
 
 
 if __name__ == "__main__":

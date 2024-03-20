@@ -5,23 +5,23 @@ from causal import compute_ead
 from utils import set_seed
 from visualize import visualize_examples
 
-import torch
-
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--path_data_dir", type=str, default="./data/", help="Path to the data directory")
-    parser.add_argument("--path_results_dir", type=str, default="./results/", help="Path to the results directory")
+    parser.add_argument("--data_dir", type=str, default="./data", help="Path to the data directory")
+    parser.add_argument("--results_dir", type=str, default="./results", help="Path to the results directory")
     parser.add_argument("--batch_size", type=int, default=256, help="Batch size")
-    parser.add_argument("--num_epochs", type=int, default=2, help="Number of epochs")
+    parser.add_argument("--num_epochs", type=int, default=3, help="Number of epochs")
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
-    parser.add_argument("--model_name", type=str, default="dino", help="Model name")
-    parser.add_argument("--outcome", type=str, default="yellow", help="Outcome")
+    parser.add_argument("--encoder_name", type=str, default="dino", help="Model name")
+    parser.add_argument("--task", type=str, default="all", help="Outcome type")
     parser.add_argument("--num_proc", type=int, default=4, help="Number of processes")
-    parser.add_argument("--environment", type=str, default="train", help="Environment")
-    parser.add_argument("--test_size", type=float, default=0.2, help="Test size")
+    parser.add_argument("--environment", type=str, default="supervised", help="Environment")
     parser.add_argument("--verbose", type=bool, default=True, help="Verbose")
     parser.add_argument("--seed", type=int, default=42, help="Seed")
+    parser.add_argument("--split_criteria", type=str, default="experiment_easy", help="Splitting criteria")
+    parser.add_argument("--n_examples", type=int, default=36, help="Number of examples used for visualization.")
+    parser.add_argument("--token", type=str, default="class", help="Token considered for embedding via ViT")    
 
     return parser
 
@@ -30,38 +30,40 @@ def main(args):
     set_seed(args.seed)
 
     print("Loading data")
-    X, y = get_data_sl(environment=args.environment, 
-                       model_name=args.model_name, 
-                       data_dir=args.path_data_dir,
-                       outcome=args.outcome)
+    X, y, split = get_data_sl(environment=args.environment, 
+                              encoder_name=args.encoder_name, 
+                              data_dir=args.data_dir,
+                              task=args.task,
+                              split_criteria=args.split_criteria,
+                              token=args.token)
     
     print("Training Model")
-    model = train_model(X, y, 
-                        test_size=args.test_size, 
+    model = train_model(X, y,  
                         batch_size=args.batch_size, 
                         num_epochs=args.num_epochs, 
                         lr=args.lr, 
+                        split=split,
                         verbose=args.verbose)
-    y_pred = model.pred(X)
-    y_cond_exp = model.cond_exp(X)
+    y_probs = model.probs(X.to(model.device)).to("cpu")
+    y_pred = model.pred(X.to(model.device)).to("cpu")
 
-    # get 36 integeres at random in [0,len(y)] with torch
-    idxs = torch.randint(0, len(y), (36,))
-    visualize_examples(idxs, 
-                       outcome=args.outcome, 
-                       model_name=args.model_name, 
+    visualize_examples(n=args.n_examples, 
+                       task=args.task, 
+                       encoder_name=args.encoder_name, 
                        model=model, 
                        save=True, 
-                       path_results_dir="./results/")
+                       data_dir=args.data_dir,
+                       results_dir=args.results_dir,
+                       token=args.token)
 
     print("ATE Estimation")
     X, y, t = get_data_cl(environment=args.environment, 
-                          data_dir=args.path_data_dir,
-                          outcome=args.outcome)
+                          data_dir=args.data_dir,
+                          task=args.task)
     print(f"ATE (GT)")
     ate_B, ate_inf = compute_ead(y, t, verbose=args.verbose)
     print(f"ATE (ML)")
-    ate_ml_B, ate_ml_inf = compute_ead(y_cond_exp, t, verbose=args.verbose)
+    ate_ml_B, ate_ml_inf = compute_ead(y_probs, t, verbose=args.verbose)
     print(f"ATE (ML disc.)")
     ate_ml_d_B, ate_ml_d_inf = compute_ead(y_pred, t, verbose=args.verbose)
     #print(f"ATE (CL)")

@@ -1,46 +1,58 @@
-from transformers import ViTImageProcessor, ViTForImageClassification
-from transformers import AutoImageProcessor, ResNetForImageClassification
-from transformers import AutoImageProcessor, AutoModel
-from transformers import AutoProcessor, CLIPVisionModel
-from torch.utils.data import DataLoader
+from transformers import ViTImageProcessor, AutoImageProcessor, AutoProcessor, SiglipImageProcessor
+from transformers import ViTForImageClassification, ResNetForImageClassification, AutoModel, CLIPVisionModel, ViTMAEModel, SiglipVisionModel
+from datasets import Dataset
+
 import torch
 from torch import nn
-from datasets import Dataset
+from torch.utils.data import DataLoader
+
 from tqdm import tqdm
 import os
 
-def get_model(model_name, device="cpu"):
-    if model_name == "dino":
+def get_model(encoder_name, device="cpu"):
+    if encoder_name == "dino":
         processor = AutoImageProcessor.from_pretrained('facebook/dinov2-base')
         model = AutoModel.from_pretrained('facebook/dinov2-base').to(device)
-    elif model_name == "vit":
+    elif encoder_name == "vit":
         processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224')
         model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224').to(device)
-    elif model_name == "resnet":
+    elif encoder_name == "vit_large":
+        processor = SiglipImageProcessor.from_pretrained('google/siglip-base-patch16-512')
+        model = SiglipVisionModel.from_pretrained('google/siglip-base-patch16-512').to(device)
+    elif encoder_name == "resnet":
         processor = AutoImageProcessor.from_pretrained("microsoft/resnet-50")
         model = ResNetForImageClassification.from_pretrained("microsoft/resnet-50").to(device)
-    elif model_name == "clip":
+    elif encoder_name == "clip":
         processor = AutoProcessor.from_pretrained("openai/clip-vit-base-patch32")        
         model = CLIPVisionModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
+    elif encoder_name == "clip_large":
+        processor = AutoProcessor.from_pretrained('openai/clip-vit-large-patch14-336')
+        model = CLIPVisionModel.from_pretrained('openai/clip-vit-large-patch14-336').to(device)
+    elif encoder_name == "mae":
+        processor = AutoImageProcessor.from_pretrained('facebook/vit-mae-large')
+        model = ViTMAEModel.from_pretrained('facebook/vit-mae-large').to(device)
     else:
-        raise ValueError(f"Model name: {model_name} is not implemented.")
+        raise ValueError(f"Encoder name: {encoder_name} is not implemented.")
     return processor, model
 
 
-def add_embeddings(data, model_name, batch_size=100, num_proc=4, environment="train"):
-    subfolders = [f.name for f in os.scandir("./data") if f.is_dir()]
-    if (model_name in subfolders):
-        environments = [f.name for f in os.scandir(f"./data/{model_name}") if f.is_dir()]
+def get_embeddings(data, encoder_name, batch_size=100, num_proc=4, environment="supervised", data_dir="./data", token="class", verbose=True):
+    data_emb_dir = os.path.join(data_dir, "embeddings", token, encoder_name)
+    if os.path.exists(data_emb_dir):
+        environments = [f.name for f in os.scandir(data_emb_dir) if f.is_dir()]
         if (environment in environments):
-            print(f"Embedding {model_name} already extracted.")
-            return data
-        
+            if verbose: print(f"Embeddings from encoder '{encoder_name}' token '{token}' already extracted.")
+            data_emb_env_dir = os.path.join(data_emb_dir, environment)
+            embeddings = Dataset.load_from_disk(data_emb_env_dir)
+            return embeddings
+    else:
+        os.makedirs(data_emb_dir)
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
-    processor, model = get_model(model_name, device)
+    processor, model = get_model(encoder_name, device)
     model.eval().requires_grad_(False)
     # data = data.map(lambda x: {"emb1": encoder(x["image"], model, processor, device)}, batch_size=batch_size, batched=True, num_proc=num_proc)
-    
     dataloader = DataLoader(
         data,
         batch_size=batch_size,
@@ -50,44 +62,78 @@ def add_embeddings(data, model_name, batch_size=100, num_proc=4, environment="tr
     )
     embeddings = []
     for batch in tqdm(dataloader):
-        embedding = encoder(batch["image"], model, processor, device)
+        embedding = encoder(batch["image"], model, processor, device, token)
         embeddings.append(embedding)
     embeddings = torch.cat(embeddings, 0)
-    embeddings = Dataset.from_dict({model_name: embeddings.tolist()})
-    embeddings.set_format(type="torch", columns=[model_name])
-    embeddings.save_to_disk(f"./data/{model_name}/{environment}")
-        
-    return data
+    embeddings = Dataset.from_dict({encoder_name: embeddings.tolist()})
+    embeddings.set_format(type="torch", columns=[encoder_name])
+    data_emb_env_dir = os.path.join(data_emb_dir, environment)
+    embeddings.save_to_disk(data_emb_env_dir)
+    if verbose: print(f"Embeddings from encoder '{encoder_name}' token '{token}' computed and saved correctly.")
+    return embeddings
 
 
-def encoder(x, model, processor, device):
+def encoder(x, model, processor, device, token="class"):
     inputs = processor(images=x, return_tensors="pt").to(device)
     outputs = model(**inputs, output_hidden_states=True)
-    model_name_full = model.config._name_or_path
-    if ("vit" in model_name_full) or ("dino" in model_name_full):
-        emb = outputs.hidden_states[-1][:, 0]
-    elif ("resnet" in model_name_full):
+    encoder_name_full = model.config._name_or_path
+    if ("vit" in encoder_name_full) or ("dino" in encoder_name_full) or ("siglip" in encoder_name_full):
+        if token=="class":
+            emb = outputs.hidden_states[-1][:, 0]
+        elif token=="mean":
+            emb = outputs.hidden_states[-1][:,1:].mean(dim=1)
+        else:
+            raise ValueError("Token criteria not recognized. Please select between: 'class', 'mean'.")
+    elif ("resnet" in encoder_name_full):
         emb = outputs.hidden_states[-1].mean(dim=[2,3])
     else:
-        raise ValueError(f"Unkown model class: {model_name_full}")
+        raise ValueError(f"Unkown model class: {encoder_name_full}")
     return emb.to("cpu")
 
 class MLP(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self, input_size, hidden_size, task):
         super().__init__()
+        self.task = task
+        if task=="all":
+            output_size = 2
+        elif task=="sum":
+            output_size = 3
+        else:
+            output_size = 1
         self.output_size = output_size
         self.model = nn.Sequential(
-                            nn.Linear(input_size, hidden_size),
+                            nn.Linear(input_size, 2*hidden_size),
                             nn.ReLU(),
-                            nn.Linear(hidden_size, output_size) 
+                            #nn.Linear(2*hidden_size, hidden_size),
+                            #nn.ReLU(),
+                            nn.Linear(2*hidden_size, output_size),
                         )
+        self.init_weights()
+        
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.constant_(m.bias, 0.0)
+
     def forward(self, X):
-        return self.model(X) # [9, 7, -5]
+        return self.model(X) # [-1.8, 0.4]
     def probs(self, X):
-        return nn.functional.softmax(self.model(X), dim=1) # [0.8, 0.19, 0.01]
+        if self.task=="sum":
+            return self.model(X).softmax(dim=-1) # [0.7, 0.1, 0.2]
+        else:
+            return self.model(X).sigmoid() # [0.8, 0.4]
     def pred(self, X):
-        return self.model(X).argmax(dim=1).float() # 0.0
+        if self.task=="sum":
+            return torch.argmax(self.model(X), dim=-1) # [0]
+        else:
+            return self.probs(X).round() # [1, 0]
     def cond_exp(self, X):
-        values = torch.tensor(range(self.output_size)).float() 
-        probs = self.probs(X)
-        return torch.matmul(probs, values)  #  0.21 (0.8*0 + 0.19*1 + 0.01*2)
+        if self.task=="sum":
+            values = torch.tensor(range(3)).float() 
+            probs = self.probs(X)
+            return torch.matmul(probs, values) # [0.5]
+        else:
+            return self.probs(X) # [0.8, 0.4]
+        
+    

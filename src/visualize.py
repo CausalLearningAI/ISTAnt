@@ -1,33 +1,49 @@
 import matplotlib.pyplot as plt
-from data import get_example
+from data import get_examples
 import os
 
-def visualize_examples(idxs, outcome, model_name, model, save=True, path_results_dir="./results/"):
-    n = len(idxs)
+def visualize_examples(n, encoder_name, model, task="all", environment="supervised", save=True, data_dir="./data", results_dir="./results", token="all"):
     if n < 6:
         columns = n
     else:
         columns = 6   
     rows = n//6 + 1
-    fig = plt.figure(figsize=(13, rows*2.7))
+    fig = plt.figure(figsize=(15, rows*2.7))
     ax = []
-    for i, idx in enumerate(idxs):
-        img, y, emb = get_example(environment="train", 
-                                    idx=idx, 
-                                    outcome=outcome, 
-                                    model_name=model_name)
-        y_pred = model.pred(emb)
-        plt.rc('font', size=8)
-        ax.append(fig.add_subplot(rows, columns, i + 1))
-        ax[-1].set_title(f"Outcome: {y}, Pred: {y_pred}")
-        plt.imshow(img)
+    imgs, ys, embs = get_examples(environment=environment, 
+                                  n=n, 
+                                  task=task, 
+                                  encoder_name=encoder_name,
+                                  data_dir=data_dir,
+                                  token=token)
+    if environment=="supervised":
+        for i, (img, y, emb) in enumerate(zip(imgs, ys, embs)):
+            y_pred = [int(elem.item()) for elem in model.to("cpu").pred(emb)]
+            y = [int(elem.item()) for elem in y.unsqueeze(-1)]
+            plt.rc('font', size=8)
+            ax.append(fig.add_subplot(rows, columns, i + 1))
+            ax[-1].set_title(f"H: {y}, ML: {y_pred}")
+            plt.imshow(img.permute(1, 2, 0))
+    elif environment=="unsupervised":
+        for i, (img, emb) in enumerate(zip(imgs, embs)):
+            y_pred = [int(elem.item()) for elem in model.to("cpu").pred(emb)]
+            plt.rc('font', size=8)
+            ax.append(fig.add_subplot(rows, columns, i + 1))
+            ax[-1].set_title(f"ML: {y_pred}")
+            plt.imshow(img.permute(1, 2, 0))
+    else:
+        raise ValueError(f"Environment {environment} not defined.")
     if save: 
-        if not os.path.exists(path_results_dir):
-            os.makedirs(path_results_dir)
-        plt.savefig(f"path_results_dir+", bbox_inches='tight')
-    plt.show()
+        results_example_dir = os.path.join(results_dir, "example_pred")
+        if not os.path.exists(results_example_dir):
+            os.makedirs(results_example_dir)
+        title = f"{encoder_name}_{token}_task_{task}_env_{environment[:-7]}.png"
+        path_fig = os.path.join(results_example_dir, title)
+        plt.savefig(path_fig, bbox_inches='tight')
+    else:
+        plt.show()
 
-def plot_outcome_distribution(data, save=False, total=True):
+def plot_outcome_distribution(data, save=False, total=True, results_dir="./results"):
     T = data['treatment']
     Y = data['outcome']
     fig, axs = plt.subplots(1, 2+total, figsize=(12+6*total, 5))
@@ -67,8 +83,10 @@ def plot_outcome_distribution(data, save=False, total=True):
         axs[2].legend()
         axs[2].set_title(f'Grooming (total)')
     if save:
-        if not os.path.exists('results'):
-            os.makedirs('results')
-        fig.savefig('results/outcome_distribution.png')
+        if not os.path.exists(results_dir):
+            os.makedirs(results_dir)
+        title = "outcome_distribution.png"
+        path_fig = os.path.join(results_dir, title)
+        fig.savefig(path_fig)
     else:
         plt.show();
