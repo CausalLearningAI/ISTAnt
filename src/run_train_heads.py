@@ -32,8 +32,14 @@ def main(args):
         print("Encoder: ", encoder)
         for token in tokens:
             print("Token: ", token)
-            if not os.path.exists(f"./data/embeddings/{token}/{encoder}/{args.environment}"):
-                continue
+            if token=="all":
+                if not os.path.exists(f"./data/embeddings/mean/{encoder}/{args.environment}"):
+                    continue
+                if not os.path.exists(f"./data/embeddings/class/{encoder}/{args.environment}"):
+                    continue
+            else: 
+                if not os.path.exists(f"./data/embeddings/{token}/{encoder}/{args.environment}"):
+                    continue
             for task in tasks:
                 print("Task: ", task)
                 X, y, split = get_data_sl(environment=args.environment, 
