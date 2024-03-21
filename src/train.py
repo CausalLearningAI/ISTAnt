@@ -92,6 +92,6 @@ def print_performances(accs, precisions, recalls, task, environment="train"):
     if task=="all":
         print(f"  {environment}:  Accuracy=[Y2F: {accs[0]:.3f}, B2F: {accs[1]:.3f}], Precision=[Y2F {precisions[0]:.3f}, B2F {precisions[1]:.3f}], Recall=[Y2F {recalls[0]:.3f}, B2F {recalls[1]:.3f}]")
     elif task in ["yellow", "blue", "or"]:
-        print(f"  {environment}:  Accuracy={accs:.3f}, Precision={precisions:.3f}, Recall={recalls:.3f}")
+        print(f"  {environment}:  Accuracy={accs[0]:.3f}, Precision={precisions[0]:.3f}, Recall={recalls[0]:.3f}")
     elif task=="sum":
-        print(f"  {environment}:  Accuracy={accs:.3f}, Precision=[0: {precisions[0]:.3f}; 1: {precisions[1]:.3f}; 2: {precisions[2]:.3f}], Recall=[0: {recalls[0]:.3f}; 1: {recalls[1]:.3f}; 2: {recalls[2]:.3f}]")
+        print(f"  {environment}:  Accuracy={accs[0]:.3f}, Precision=[0: {precisions[0]:.3f}; 1: {precisions[1]:.3f}; 2: {precisions[2]:.3f}], Recall=[0: {recalls[0]:.3f}; 1: {recalls[1]:.3f}; 2: {recalls[2]:.3f}]")
