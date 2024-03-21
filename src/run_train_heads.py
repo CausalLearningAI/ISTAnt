@@ -21,11 +21,11 @@ def get_parser():
 
 
 def main(args):
-    seeds = [0, 1, 2, 3, 4]
     encoders = ["clip", "clip_large", "dino", "mae", "vit", "vit_large"]
     tokens = ["class", "mean", "all"]
     tasks = ["all", "blue", "yellow", "or", "sum"]
     lrs = [0.1, 0.05, 0.01, 0.005, 0.001]
+    seeds = [0, 1, 2, 3, 4]
 
     results = pd.DataFrame(columns=["encoder", "token", "task", "lr", "seed", "tr_precision", "tr_recall", "tr_accuracy", "val_precision", "val_recall", "val_accuracy"])
     for encoder in encoders:
