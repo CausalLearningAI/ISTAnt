@@ -59,6 +59,7 @@ def get_data_sl(environment="supervised", encoder_name="dino", data_dir="./data/
         X = torch.cat((embeddings_class[encoder_name], embeddings_mean[encoder_name]), dim=1)
     else:
         raise ValueError("Token criteria not recognized. Please select between: 'class', 'mean', 'all'.")
+    X.token = token
     y = get_outcome(data, task)
     if split_criteria=="experiment":
         split = (data["experiment"] == 0)

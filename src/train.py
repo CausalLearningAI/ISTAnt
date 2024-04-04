@@ -19,23 +19,25 @@ def train_model(X, y, split, batch_size=1024, num_epochs=20, lr=0.0001, verbose=
 
     model = MLP(input_size, hidden_size, task=y.task).to(device)
     model.device = device
+    model.task = y.task
+    model.token = X.token
     if y.task == "sum":
         loss_fn = torch.nn.CrossEntropyLoss()
     else:
         loss_fn = torch.nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-    print("Starting perfomances")
+    if verbose: print("Starting perfomances")
     train_accs, train_precisions, train_recalls = evaluate_model(model, X_train, y_train, device)
     if verbose: print_performances(train_accs, train_precisions, train_recalls, y.task, environment="train")
     val_accs, val_precisions, val_recalls = evaluate_model(model, X_val, y_val, device)
     if verbose: print_performances(val_accs, val_precisions, val_recalls, y.task, environment="val")
 
     for epoch in range(num_epochs):
-        print(f"Epoch {epoch}")
+        if verbose: print(f"Epoch {epoch}")
         model.train()
         train_loss = 0
-        for X_batch, y_batch in tqdm(train_loader):
+        for X_batch, y_batch in train_loader:
             X_batch, y_batch = X_batch.to(device), y_batch.to(device)
             if y.task=="sum":
                 y_batch = y_batch.long()

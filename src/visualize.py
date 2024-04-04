@@ -2,13 +2,15 @@ import matplotlib.pyplot as plt
 from data import get_examples
 import os
 
-def visualize_examples(n, encoder_name, model, task="all", environment="supervised", save=True, data_dir="./data", results_dir="./results", token="all"):
+def visualize_examples(n, encoder_name, model, environment="supervised", save=True, data_dir="./data", results_dir="./results"):
     if n < 6:
         columns = n
     else:
         columns = 6   
     rows = n//6 + 1
     fig = plt.figure(figsize=(15, rows*2.7))
+    task = model.task
+    token = model.token
     ax = []
     imgs, ys, embs = get_examples(environment=environment, 
                                   n=n, 
