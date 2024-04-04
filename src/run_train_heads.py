@@ -65,16 +65,16 @@ def main(args):
                         accs_tr, precisions_tr, recalls_tr = evaluate_model(model, X_train, y_train, device=model.device)
                         accs_val, precisions_val, recalls_val = evaluate_model(model, X_val, y_val, device=model.device)
                         result = {"encoder": encoder, 
-                                                "token": token, 
-                                                "task": task, 
-                                                "lr": lr,
-                                                "seed": seed,
-                                                "tr_precision": round(sum(precisions_tr)/len(precisions_tr), 4), 
-                                                "tr_recall": round(sum(recalls_tr)/len(recalls_tr), 4), 
-                                                "tr_accuracy": round(sum(accs_tr)/len(accs_tr), 4),
-                                                "val_precision": round(sum(precisions_val)/len(precisions_val), 4), 
-                                                "val_recall": round(sum(recalls_val)/len(recalls_val), 4), 
-                                                "val_accuracy": round(sum(accs_val)/len(accs_val), 4)}
+                                "token": token, 
+                                "task": task, 
+                                "lr": lr,
+                                "seed": seed,
+                                "tr_precision": round(sum(precisions_tr)/len(precisions_tr), 4), 
+                                "tr_recall": round(sum(recalls_tr)/len(recalls_tr), 4), 
+                                "tr_accuracy": round(sum(accs_tr)/len(accs_tr), 4),
+                                "val_precision": round(sum(precisions_val)/len(precisions_val), 4), 
+                                "val_recall": round(sum(recalls_val)/len(recalls_val), 4), 
+                                "val_accuracy": round(sum(accs_val)/len(accs_val), 4)}
                         results.loc[len(results.index)] = result
                         
     results.to_csv("results/head_training_results.csv")
