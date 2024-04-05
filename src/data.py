@@ -5,14 +5,30 @@ import os
 from datasets import Dataset
 from model import get_embeddings
 
-def get_data_cl(environment="supervised", data_dir="./data", task="all"):
+def get_data_cl(environment="supervised", data_dir="./data", task="all", aggregate=False):
     if environment=="unsupervised":
         raise ValueError("TO BE IMPLEMENTED") # TODO
     data = load_data(environment=environment, data_dir=data_dir, generate=False)
-    covariates = ['pos_x', 'pos_y', 'exp_minute', 'day_hour']
-    X = torch.stack([data[covariate] for covariate in covariates], dim=1)
-    T = data["treatment"]
-    Y = get_outcome(data, task)
+    covariates = ['pos_x', 'pos_y', 'exp_minute', 'experiment'] #, 'day_hour']
+    T = data["treatment"].int()
+    Y = get_outcome(data, task).int()
+    if aggregate:
+        data_agg = pd.DataFrame()
+        for covariate in covariates:
+            data_agg[covariate] = data[covariate]
+        data_agg["Y0"] = Y[:,0]
+        data_agg["Y1"] = Y[:,1]
+        data_agg["T"] = T
+        data_agg = data_agg.groupby(covariates).mean().reset_index()
+        data_agg = pd.get_dummies(data_agg, columns=["experiment"])
+        Y = torch.from_numpy(data_agg[["Y0","Y1"]].values)
+        T = torch.from_numpy(data_agg["T"].values).int()
+        covariates_ = data_agg.columns.difference(["Y0","Y1","T"])
+        X = torch.from_numpy(data_agg.loc[:, covariates_].values)
+    else:
+        X = torch.stack([data[covariate] for covariate in covariates[:-1]], dim=1)
+        X_exp = torch.nn.functional.one_hot(data["experiment"], num_classes=len(data["experiment"].unique()))
+        X = torch.cat([X, X_exp], dim=1)
     return Y, T, X
 
 def get_examples(environment="supervised", data_dir="./data", n=36, task="all", encoder_name="dino", token="class"):

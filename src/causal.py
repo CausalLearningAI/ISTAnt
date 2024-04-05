@@ -1,12 +1,12 @@
 from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.ensemble import GradientBoostingClassifier
+#from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor
 import torch
 import numpy as np
 from econml.dml import CausalForestDML
 from econml.metalearners import TLearner, SLearner, XLearner
 from econml.dr import DRLearner
 
-def compute_ate(Y, T, X, method="AIPW", color="preselected", model_propensity = LogisticRegression(), model_outcome = GradientBoostingClassifier(), verbose=True):
+def compute_ate(Y, T, X, method="AIPW", color="preselected", model_propensity = LogisticRegression(), model_outcome = None, verbose=True):
     if color=="yellow":
         Y = Y[:,0]
     elif color=="blue":
@@ -15,6 +15,13 @@ def compute_ate(Y, T, X, method="AIPW", color="preselected", model_propensity = 
         pass
     else:
         raise ValueError(f"Color {color} not defined. Please select between 'yellow', 'blue' or 'preselected'.")
+
+    if model_outcome is None:
+        if Y.dtype == torch.int32 or Y.dtype == torch.int64:
+            model_outcome = LogisticRegression()
+        else:
+            model_outcome = LinearRegression()
+
     if method=="ead":
         model = EAD()
     elif method=="aipw":
@@ -73,7 +80,6 @@ class AIPW:
 
     def fit(self, Y, T, X):
         N = len(Y)
-        #T = torch.from_numpy(T)
         self.model_propensity.fit(X = X, y = T)
         self.model_outcome.fit(X = torch.cat((X, T.reshape(N, 1)), dim=1), y = Y)
         mu0 = self.model_outcome.predict(torch.cat((X, torch.zeros(N, 1)), dim=1))
