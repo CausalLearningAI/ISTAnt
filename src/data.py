@@ -6,12 +6,14 @@ from datasets import Dataset
 from model import get_embeddings
 
 def get_data_cl(environment="supervised", data_dir="./data", task="all"):
+    if environment=="unsupervised":
+        raise ValueError("TO BE IMPLEMENTED") # TODO
     data = load_data(environment=environment, data_dir=data_dir, generate=False)
     covariates = ['pos_x', 'pos_y', 'exp_minute', 'day_hour']
     X = torch.stack([data[covariate] for covariate in covariates], dim=1)
-    t = data["treatment"]
-    y = get_outcome(data, task)
-    return X, y, t
+    T = data["treatment"]
+    Y = get_outcome(data, task)
+    return Y, T, X
 
 def get_examples(environment="supervised", data_dir="./data", n=36, task="all", encoder_name="dino", token="class"):
     data = load_data(environment=environment, data_dir=data_dir, generate=False)
