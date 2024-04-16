@@ -1,6 +1,6 @@
 data*
 __pycache__/
 
-crl/
+venv/
 
 .DS_Store
