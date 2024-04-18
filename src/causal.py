@@ -50,7 +50,7 @@ def compute_ate(Y, T, X, method="aipw", color="preselected", model_propensity = 
                                 )
     else:
         raise ValueError(f"'{method}' method for ATE estimation not implemented.")
-    Y = Y[(T==T_control) | (T==T_treatment)].int()
+    Y = Y[(T==T_control) | (T==T_treatment)]
     X = X[(T==T_control) | (T==T_treatment)]
     T = T[(T==T_control) | (T==T_treatment)].int()
     T[T==T_control] = 0
