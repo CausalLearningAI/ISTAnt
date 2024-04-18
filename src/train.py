@@ -36,7 +36,7 @@ def train_model(X, y, split, batch_size=1024, num_epochs=20, hidden_nodes = 512,
 
     val_b_acc_max = 0
     best_model = model
-    #best_epoch = 0
+    best_epoch = 0
     for epoch in range(1, num_epochs+1):
         if verbose: print(f"Epoch {epoch}")
         model.train()
@@ -68,7 +68,7 @@ def train_model(X, y, split, batch_size=1024, num_epochs=20, hidden_nodes = 512,
                 #print("best_model: ", torch.sum(best_model.state_dict()['model.0.weight'], dim=[0,1]).item())
                 val_b_acc_max = val_b_acc
                 best_model = deepcopy(model)
-                #best_epoch = epoch 
+                best_epoch = epoch 
 
         if verbose:
             train_accs, train_precisions, train_recalls = evaluate_model(model, X_train, y_train, device)
@@ -76,6 +76,7 @@ def train_model(X, y, split, batch_size=1024, num_epochs=20, hidden_nodes = 512,
             val_accs, val_precisions, val_recalls = evaluate_model(model, X_val, y_val, device)
             print_performances(val_accs, val_precisions, val_recalls, y.task, environment="val")
     #print(best_epoch)
+    best_model.best_epoch = best_epoch
     #print(torch.sum(best_model.state_dict()['model.0.weight'], dim=[0,1]).item())
     return best_model
 
