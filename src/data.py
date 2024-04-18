@@ -1,97 +1,329 @@
 import torch
 import pandas as pd
+import random
+import matplotlib.pyplot as plt
 import cv2
 import os
+
 from datasets import Dataset
 from model import get_embeddings
+from train import train_model
+from visualize import plot_outcome_distribution
+from utils import get_metric, set_seed, check_folder
+from causal import compute_ate
 
-def get_data_cl(environment="supervised", data_dir="./data", task="all", aggregate=False):
-    if environment=="unsupervised":
-        raise ValueError("TO BE IMPLEMENTED") # TODO
-    data = load_data(environment=environment, data_dir=data_dir, generate=False)
-    covariates = ['pos_x', 'pos_y', 'exp_minute', 'experiment'] #, 'day_hour']
-    T = data["treatment"].int()
-    Y = get_outcome(data, task).int()
-    if aggregate:
-        data_agg = pd.DataFrame()
-        for covariate in covariates:
-            data_agg[covariate] = data[covariate]
-        data_agg["Y0"] = Y[:,0]
-        data_agg["Y1"] = Y[:,1]
-        data_agg["T"] = T
-        data_agg = data_agg.groupby(covariates).mean().reset_index()
-        data_agg = pd.get_dummies(data_agg, columns=["experiment"])
-        Y = torch.from_numpy(data_agg[["Y0","Y1"]].values)
-        T = torch.from_numpy(data_agg["T"].values).int()
-        covariates_ = data_agg.columns.difference(["Y0","Y1","T"])
-        X = torch.from_numpy(data_agg.loc[:, covariates_].values)
-    else:
-        X = torch.stack([data[covariate] for covariate in covariates[:-1]], dim=1)
-        X_exp = torch.nn.functional.one_hot(data["experiment"], num_classes=len(data["experiment"].unique()))
-        X = torch.cat([X, X_exp], dim=1)
-    return Y, T, X
+class PPCI():
+    def __init__(self, task="all", encoder="dino", token="class", split_criteria="experiment", reduce_fps_factor=15, downscale_factor=1, batch_size=100, num_proc=4, environment="all", data_dir="./data/istant_lq", results_dir="./results/istant_lq", verbose=False):
+        if environment in ["all", "supervised"]:
+            self.supervised = load_env("supervised", 
+                                    task=task, 
+                                    encoder=encoder, 
+                                    token=token, 
+                                    split_criteria=split_criteria, 
+                                    reduce_fps_factor=reduce_fps_factor, 
+                                    downscale_factor=downscale_factor,
+                                    batch_size=batch_size, 
+                                    num_proc=num_proc,
+                                    data_dir=data_dir,
+                                    verbose=verbose)
+            self.n_supervised = self.supervised["T"].shape[0]
+        if environment in ["all", "unsupervised"]:
+            self.unsupervised = load_env("unsupervised", 
+                                    task=task, 
+                                    encoder=encoder, 
+                                    token=token, 
+                                    split_criteria=split_criteria, 
+                                    reduce_fps_factor=reduce_fps_factor, 
+                                    downscale_factor=downscale_factor,
+                                    batch_size=batch_size, 
+                                    num_proc=num_proc,
+                                    data_dir=data_dir,
+                                    verbose=verbose)
+            self.n_unsupervised = self.unsupervised["T"].shape[0]
+        self.task = task
+        self.encoder = encoder
+        self.token = token
+        self.split_criteria = split_criteria
+        self.data_dir = data_dir
+        self.results_dir = results_dir
+        if verbose: print("Prediction-Powered Causal Inference dataset successfully loaded.")
+    
+    def train(self, batch_size=1024, num_epochs=10, lr=0.001, hidden_nodes = 512, hidden_layers = 2, verbose=True, add_pred_env="supervised", seed=1, save=True):
+        set_seed(seed)
+        self.model = train_model(self.supervised["X"], 
+                                 self.supervised["Y"], 
+                                 self.supervised["split"], 
+                                 batch_size=batch_size, 
+                                 num_epochs=num_epochs, 
+                                 lr=lr, 
+                                 hidden_nodes = hidden_nodes, 
+                                 hidden_layers = hidden_layers,
+                                 verbose=verbose)
+        if save:
+            model_dir = os.path.join(self.results_dir, "models", self.encoder, self.token, self.split_criteria, self.task, str(hidden_layers), str(lr), str(seed))
+            check_folder(model_dir)
+            torch.save(self.model.state_dict(), os.path.join(model_dir, "model.pth"))
+        if add_pred_env in ["supervised", "unsupervised"]:
+            self.add_pred(add_pred_env)
+        elif add_pred_env=="all":
+            self.add_pred("supervised")
+            self.add_pred("unsupervised")
+        else:
+            raise ValueError(f"Invalid add_pred_env argumen '{add_pred_env}', please select among: 'supervised', 'unsupervised', or 'all'.")
+    
+    def plot_out_distribution(self, save=True, total=True):
+        plot_outcome_distribution(self.supervised, save=save, total=total, results_dir=self.results_dir)
 
-def get_examples(environment="supervised", data_dir="./data", n=36, task="all", encoder_name="dino", token="class"):
-    data = load_data(environment=environment, data_dir=data_dir, generate=False)
-    idxs = torch.randint(0, len(data), (n,))
-    image = data[idxs]["image"]
-    if environment=="supervised":
-        y = get_outcome(data[idxs], task)
-    else:
-        y = None
-    tokens = ["class", "mean"]
-    if token in tokens:
-        embeddings = get_embeddings(data, encoder_name, environment=environment, data_dir=data_dir, token=token, verbose=False)[idxs]
-        embeddings = embeddings[encoder_name]
-    elif token=="all":
-        embeddings_class = get_embeddings(data, encoder_name, environment=environment, data_dir=data_dir, token=tokens[0], verbose=False)[idxs]
-        embeddings_mean = get_embeddings(data, encoder_name, environment=environment, data_dir=data_dir, token=tokens[1], verbose=False)[idxs]
-        embeddings = torch.cat((embeddings_class[encoder_name], embeddings_mean[encoder_name]), dim=1)
-    return image, y, embeddings
+    def add_pred(self, environment="supervised"):
+        if hasattr(self, 'model'):
+            device = self.model.device
+            with torch.no_grad():
+                if environment=="supervised":
+                    self.supervised["Y_hat"] = self.model.cond_exp(self.supervised["X"].to(device)).to("cpu").squeeze()
+                elif environment=="unsupervised":
+                    self.unsupervised["Y_hat"] = self.model.cond_exp(self.unsupervised["X"].to(device)).to("cpu").squeeze()
+                elif environment=="all":
+                    self.supervised["Y_hat"] = self.model.cond_exp(self.supervised["X"].to(device)).to("cpu").squeeze()
+                    self.unsupervised["Y_hat"] = self.model.cond_exp(self.unsupervised["X"].to(device)).to("cpu").squeeze()
+                else:
+                    raise ValueError(f"Environment '{environment}' not defined.")
+        else:
+            raise ValueError("Train the model first, before computing the inference step.")
+    
+    def evaluate(self, train=False, color="blue", T_control=1, T_treatment=2, verbose=False):
+        if "Y_hat" in self.supervised:
+            if self.task=="all":
+                if color=="yellow":
+                    Y = self.supervised["Y"][:,0]
+                    Y_hat = self.supervised["Y_hat"][:,0]
+                elif color=="blue":
+                    Y = self.supervised["Y"][:,1]
+                    Y_hat = self.supervised["Y_hat"][:,1]
+                else:
+                    raise ValueError(f"Invalid color '{color}', please select between: 'blue', 'yellow'.")
+            else:
+                Y = self.supervised["Y"]
+                Y_hat = self.supervised["Y_hat"]
+            split = self.supervised["split"]
+            if train:
+                Y_ = Y[split]
+                Y_hat_ = Y_hat[split]
+                T_ = self.supervised["T"][split]
+            else:
+                Y_ = Y[~split]
+                Y_hat_ = Y_hat[~split]
+                T_ = self.supervised["T"][~split]
+            # prediction
+            acc = get_metric(Y_, Y_hat_.round(), metric="accuracy")
+            balanced_acc = get_metric(Y_, Y_hat_.round(), metric="balanced_acc")
+            bias = get_metric(Y_, Y_hat_, metric="bias")
+            bias_d = get_metric(Y_, Y_hat_.round(), metric="bias")
+            # TODO: add tr_equity statistic test
+            tr_equality_control = get_metric(Y_[T_==T_control], Y_hat_[T_==T_control].round(), metric="tr_equality") 
+            tr_equality_treatment = get_metric(Y_[T_==T_treatment], Y_hat_[T_==T_treatment].round(), metric="tr_equality")
+            # causal effect
+            ead = compute_ate(Y, 
+                              self.supervised["T"], 
+                              self.supervised["W"], 
+                              method="ead", 
+                              color="preselected", 
+                              T_control=T_control, 
+                              T_treatment=T_treatment)
+            ead_offset = compute_ate(Y_hat, 
+                              self.supervised["T"], 
+                              self.supervised["W"], 
+                              method="ead", 
+                              color="preselected", 
+                              T_control=T_control, 
+                              T_treatment=T_treatment) - ead
+            ead_offset_d = compute_ate(Y_hat.round(), 
+                              self.supervised["T"], 
+                              self.supervised["W"], 
+                              method="ead", 
+                              color="preselected", 
+                              T_control=T_control, 
+                              T_treatment=T_treatment) - ead
+            aipw_offset = compute_ate(Y_hat, 
+                              self.supervised["T"], 
+                              self.supervised["W"], 
+                              method="aipw", 
+                              color="preselected", 
+                              T_control=T_control, 
+                              T_treatment=T_treatment) - ead
+            aipw_offset_d = compute_ate(Y_hat, 
+                              self.supervised["T"], 
+                              self.supervised["W"], 
+                              method="aipw", 
+                              color="preselected", 
+                              T_control=T_control, 
+                              T_treatment=T_treatment) - ead
+            metric = {
+                "acc": acc,
+                "balanced_acc": balanced_acc,
+                "bias": bias,
+                "bias_d": bias_d,
+                "tr_equality_control": tr_equality_control,
+                "tr_equality_treatment": tr_equality_treatment,
+                "ead": ead,
+                "ead_offset": ead_offset,
+                "ead_offset_d": ead_offset_d,
+                "aipw_offset": aipw_offset,
+                "aipw_offset_d": aipw_offset_d,
+            }
+            if verbose: print(metric)
+            return metric
+        else:
+            raise ValueError("Train the model and predict the labels on the supervised dataset, before measuring the performances.")
 
-def get_outcome(data, task):
+    def get_examples(self, n, environment="supervised", validation=False):
+        if environment=="supervised":
+            if validation:
+                val_indeces = torch.nonzero(~self.supervised["split"]).squeeze()
+                idxs = random.sample(val_indeces.tolist(), n)
+            else:
+                train_indeces = torch.nonzero(self.supervised["split"]).squeeze()
+                idxs = random.sample(train_indeces.tolist(), n)
+            image = self.supervised["source_data"][idxs]["image"]
+            Y = self.supervised["Y"][idxs] 
+            if "Y_hat" in self.supervised:
+                Y_hat = self.supervised["Y_hat"][idxs] 
+            else:
+                Y_hat = None
+        elif environment=="unsupervised":
+            idxs = torch.randint(0, self.n_unsupervised, (n,))
+            image = self.unsupervised["source_data"][idxs]["image"]
+            Y = None
+            if "Y_hat" in self.unsupervised:
+                Y_hat = self.unsupervised["Y_hat"][idxs] 
+            else:
+                Y_hat = None
+        else:
+            raise ValueError(f"Environemnt '{environment}' not defined, please select between: 'supervised' and 'unsupervised'.")
+        return image, Y, Y_hat
+
+    def visualize(self, save=True, k=6):
+        train, test = False, False
+        if hasattr(self, 'supervised'):
+            if ("Y_hat" in self.supervised):
+                train = True
+        if hasattr(self, 'unsupervised'):
+            if ("Y_hat" in self.unsupervised):
+                test = True
+        if train+test==0:
+            raise ValueError("Generate first at least an environment, train a model and predict the corresponding labels before visualizing.")
+        fig = plt.figure(figsize=(k*2.5, 0.4+4.4*train+2.2*test))
+        ax = []
+        if train: 
+            # train
+            images, Ys, Y_hats = self.get_examples(k, environment="supervised", validation=False)
+            for i, (img, y, y_pred) in enumerate(zip(images, Ys, Y_hats.round())):
+                y_pred = [int(elem.item()) for elem in y_pred.unsqueeze(-1)]
+                y = [int(elem.item()) for elem in y.unsqueeze(-1)]
+                plt.rc('font', size=8)
+                ax.append(fig.add_subplot(2*train+test, k, i + 1))
+                ax[-1].set_title(f"H: {y}, ML: {y_pred}")
+                plt.imshow(img.permute(1, 2, 0))
+                plt.gca().set_xticks([])
+                plt.gca().set_yticks([])
+            ax[0].annotate('Training', xy=(0, 0.5), xytext=(-ax[0].yaxis.labelpad - 5, 0),
+                            xycoords=ax[0].yaxis.label, textcoords='offset points',
+                            fontsize=14, ha='center', va='center', rotation=90)
+            # validation
+            images, Ys, Y_hats = self.get_examples(k, environment="supervised", validation=True)
+            for i, (img, y, y_pred) in enumerate(zip(images, Ys, Y_hats.round())):
+                y_pred = [int(elem.item()) for elem in y_pred.unsqueeze(-1)]
+                y = [int(elem.item()) for elem in y.unsqueeze(-1)]
+                plt.rc('font', size=8)
+                ax.append(fig.add_subplot(2*train+test, k, i + k + 1))
+                ax[-1].set_title(f"H: {y}, ML: {y_pred}")
+                plt.imshow(img.permute(1, 2, 0))
+                plt.gca().set_xticks([])
+                plt.gca().set_yticks([])
+            ax[k].annotate('Validation', xy=(0, 0.5), xytext=(-ax[k].yaxis.labelpad - 5, 0),
+                            xycoords=ax[k].yaxis.label, textcoords='offset points',
+                            fontsize=14, ha='center', va='center', rotation=90)
+        if test:
+            # test
+            images, _, Y_hats = self.get_examples(k, environment="unsupervised")
+            for i, (img, y_pred) in enumerate(zip(images, Y_hats.round())):
+                y_pred = [int(elem.item()) for elem in y_pred.unsqueeze(-1)]
+                plt.rc('font', size=8)
+                ax.append(fig.add_subplot(2*train+test, k, i + 2*train*k +1))
+                ax[-1].set_title(f"ML: {y_pred}")
+                plt.imshow(img.permute(1, 2, 0))
+                plt.gca().set_xticks([])
+                plt.gca().set_yticks([])
+            ax[2*train*k].annotate('Test', xy=(0, 0.5), xytext=(-ax[2*train*k].yaxis.labelpad - 5, 0),
+                            xycoords=ax[2*train*k].yaxis.label, textcoords='offset points',
+                            fontsize=14, ha='center', va='center', rotation=90)
+        if save: 
+            results_example_dir = os.path.join(self.results_dir, "example_pred")
+            if not os.path.exists(results_example_dir):
+                os.makedirs(results_example_dir)
+            title = f"{self.encoder}_{self.token}_task_{self.task}.png"
+            path_fig = os.path.join(results_example_dir, title)
+            plt.savefig(path_fig, bbox_inches='tight')
+        else:
+            plt.show()
+
+    def __str__(self):
+        return "Prediction-Powered Causal Inference dataset (PPCI object)"
+
+    def __repr__(self):
+        return "Prediction-Powered Causal Inference dataset (PPCI object)"
+
+def get_outcome(dataset, task="all"):
     if task=="all":
-        y = data["outcome"]
+        y = dataset["outcome"]
     elif task.lower()=="yellow":
-        y = data["outcome"][:,0]
+        y = dataset["outcome"][:,0]
     elif task.lower()=="blue":
-        y = data["outcome"][:,1]
+        y = dataset["outcome"][:,1]
     elif task.lower()=="sum":
-        y = data["outcome"].sum(axis=1)
+        y = dataset["outcome"].sum(axis=1)
     elif task.lower()=="or":
-        y = torch.logical_or(data["outcome"][:,0], data["outcome"][:,1]).float()
+        y = torch.logical_or(dataset["outcome"][:,0], dataset["outcome"][:,1]).float()
     else:
         raise ValueError(f"Task {task} not defined. Please select between: 'all', 'yellow', 'blue', 'sum', 'or'.")
     y.task = task
     return y
 
-def get_data_sl(environment="supervised", encoder_name="dino", data_dir="./data/", task="all", split_criteria="experiment", token="class"):
-    data = load_data(environment=environment, data_dir=data_dir, generate=False)
-    tokens = ["class", "mean"]
-    if token in tokens:
-        embeddings = get_embeddings(data, encoder_name, environment=environment, data_dir=data_dir, token=token, verbose=False)
-        X = embeddings[encoder_name]
-    elif token=="all":
-        embeddings_class = get_embeddings(data, encoder_name, environment=environment, data_dir=data_dir, token=tokens[0], verbose=False)
-        embeddings_mean = get_embeddings(data, encoder_name, environment=environment, data_dir=data_dir, token=tokens[1], verbose=False)
-        X = torch.cat((embeddings_class[encoder_name], embeddings_mean[encoder_name]), dim=1)
-    else:
-        raise ValueError("Token criteria not recognized. Please select between: 'class', 'mean', 'all'.")
-    X.token = token
-    y = get_outcome(data, task)
+def get_split(dataset, split_criteria="experiment"):
     if split_criteria=="experiment":
-        split = (data["experiment"] == 0)
+        split = (dataset["experiment"] == 0) # tr_ration: 1/5
     elif split_criteria=="experiment_easy":
-        split = (data["experiment"] != 4)
+        split = (dataset["experiment"] != 4) # tr_ration: 4/5
     elif split_criteria=="position":
-        split = (data["position"] == 0)
+        split = (dataset["position"] == 0) # tr_ration: 1/9
     elif split_criteria=="position_easy":
-        split = (data["position"] != 9)
+        split = (dataset["position"] != 9) # tr_ration: 8/9
+    elif split_criteria=="random":
+        split = torch.zeros_like(dataset["experiment"], dtype=torch.bool)
+        exps = [0,0,1,1,2,2,3,3,4]
+        poss = [1,2,3,4,5,6,7,8,9]
+        for exp_i, pos_i in zip(exps,poss):
+            split_i = (dataset["experiment"]==exp_i) & (dataset["position"]==pos_i)
+            split = split | split_i # tr_ration: 1/5
+    elif split_criteria=="random_easy":
+        split = torch.ones_like(dataset["experiment"], dtype=torch.bool)
+        exps = [0,0,1,1,2,2,3,3,4]
+        poss = [1,2,3,4,5,6,7,8,9]
+        for exp_i, pos_i in zip(exps,poss):
+            split_i = (dataset["experiment"]!=exp_i) | (dataset["position"]!=pos_i)
+            split = split & split_i # tr_ration: 4/5
     else:
-        raise ValueError(f"Split criteria {split_criteria} doesn't exist. Please select a valid splitting criteria: 'experiment', 'position'.")
-    return X, y, split
+        raise ValueError(f"Split criteria {split_criteria} doesn't exist. Please select a valid splitting criteria: 'experiment', 'position' and 'random'.")
+    split.criteria = split_criteria
+    return split
 
-def load_data(environment='supervised', data_dir="./data", generate=False, reduce_fps_factor=10, downscale_factor=0.4, verbose=False):
+def get_covariates(dataset):
+    covariates = ['pos_x', 'pos_y', 'exp_minute', 'experiment']
+    W = torch.stack([dataset[covariate] for covariate in covariates[:-1]], dim=1)
+    W_exp = torch.nn.functional.one_hot(dataset["experiment"], num_classes=len(dataset["experiment"].unique()))
+    W = torch.cat([W, W_exp], dim=1)
+    return W
+
+def load_env(environment='supervised', task="all", encoder="mae", token="class", split_criteria="experiment", generate=False, reduce_fps_factor=10, downscale_factor=1, batch_size=100, num_proc=4, data_dir="./data", verbose=False):
     data_env_dir = os.path.join(data_dir, environment)
     if generate:
         dataset = Dataset.from_generator(generator, gen_kwargs={"reduce_fps_factor": reduce_fps_factor, "downscale_factor": downscale_factor, "environment":environment, "data_dir":data_dir})
@@ -99,10 +331,19 @@ def load_data(environment='supervised', data_dir="./data", generate=False, reduc
         if verbose: print("Data generated and saved correctly.")
     else:
         if not os.path.exists(data_env_dir):
-            raise Exception("The dataset is not saved, please set generate=True to generate the dataset, or correct the path_dir.")
+            raise Exception(f"The dataset ({environment}) is not saved, please set generate=True to generate the dataset, or correct the path_dir.")
         dataset = Dataset.load_from_disk(data_env_dir)
     dataset.set_format(type="torch", columns=["image", "treatment", "outcome", 'pos_x', 'pos_y', 'exp_minute', 'day_hour', 'frame', "experiment", "position"], output_all_columns=True)
-    return dataset
+    dataset.environment = environment
+    dataset_dict = {
+        "source_data": dataset,
+        "X": get_embeddings(dataset, encoder, batch_size=batch_size, num_proc=num_proc, data_dir=data_dir, token=token, verbose=verbose),
+        "Y": get_outcome(dataset, task=task),
+        "split": get_split(dataset, split_criteria=split_criteria),
+        "W": get_covariates(dataset), 
+        "T": dataset["treatment"],
+    }
+    return dataset_dict
 
 def generator(reduce_fps_factor, downscale_factor, environment='supervised', data_dir="./data"):
     if environment == 'supervised':
@@ -139,7 +380,8 @@ def generator(reduce_fps_factor, downscale_factor, environment='supervised', dat
             labels = load_labels(exp, pos, 
                                  reduce_fps_factor=reduce_fps_factor,
                                  start_frame=start_frame,
-                                 end_frame=end_frame)
+                                 end_frame=end_frame,
+                                 data_dir=data_dir)
             for i in range(end_frame-start_frame):
                 yield {
                     "experiment": id_exp,
@@ -170,8 +412,9 @@ def label_frame(frame_id, behaviors):
             return map_behaviour_to_label(row[' Behavior'])
     return (0,0)
         
-def load_labels(exp, pos, reduce_fps_factor, start_frame, end_frame):
-    behaviors = pd.read_csv(f'./data/behavior/{exp}{pos}.csv', skiprows=3, skipfooter=1, engine='python')
+def load_labels(exp, pos, reduce_fps_factor, start_frame, end_frame, data_dir):
+    behaviors_path = os.path.join(data_dir, f"behavior/{exp}{pos}.csv")
+    behaviors = pd.read_csv(behaviors_path, skiprows=3, skipfooter=1, engine='python')
     if behaviors.shape[0]==0:
         return torch.zeros(end_frame-start_frame, 2, dtype=torch.float32)
     else:

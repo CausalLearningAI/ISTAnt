@@ -21,7 +21,7 @@ Automatic treatment effect estimation on ecological data with partial labelling
 
 ### Data Distribution
 
-![Outcome distribution](results/outcome_distribution.png)
+![Outcome distribution](results/instant_lq/outcome_distribution.png)
 
 ### Research Question
 

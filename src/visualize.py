@@ -1,53 +1,9 @@
 import matplotlib.pyplot as plt
-from data import get_examples
 import os
 
-def visualize_examples(n, encoder_name, model, environment="supervised", save=True, data_dir="./data", results_dir="./results"):
-    if n < 6:
-        columns = n
-    else:
-        columns = 6   
-    rows = n//6 + 1
-    fig = plt.figure(figsize=(15, rows*2.7))
-    task = model.task
-    token = model.token
-    ax = []
-    imgs, ys, embs = get_examples(environment=environment, 
-                                  n=n, 
-                                  task=task, 
-                                  encoder_name=encoder_name,
-                                  data_dir=data_dir,
-                                  token=token)
-    if environment=="supervised":
-        for i, (img, y, emb) in enumerate(zip(imgs, ys, embs)):
-            y_pred = [int(elem.item()) for elem in model.to("cpu").pred(emb).unsqueeze(-1)]
-            y = [int(elem.item()) for elem in y.unsqueeze(-1)]
-            plt.rc('font', size=8)
-            ax.append(fig.add_subplot(rows, columns, i + 1))
-            ax[-1].set_title(f"H: {y}, ML: {y_pred}")
-            plt.imshow(img.permute(1, 2, 0))
-    elif environment=="unsupervised":
-        for i, (img, emb) in enumerate(zip(imgs, embs)):
-            y_pred = [int(elem.item()) for elem in model.to("cpu").pred(emb).unsqueeze(-1)]
-            plt.rc('font', size=8)
-            ax.append(fig.add_subplot(rows, columns, i + 1))
-            ax[-1].set_title(f"ML: {y_pred}")
-            plt.imshow(img.permute(1, 2, 0))
-    else:
-        raise ValueError(f"Environment {environment} not defined.")
-    if save: 
-        results_example_dir = os.path.join(results_dir, "example_pred")
-        if not os.path.exists(results_example_dir):
-            os.makedirs(results_example_dir)
-        title = f"{encoder_name}_{token}_task_{task}_env_{environment[:-7]}.png"
-        path_fig = os.path.join(results_example_dir, title)
-        plt.savefig(path_fig, bbox_inches='tight')
-    else:
-        plt.show()
-
-def plot_outcome_distribution(data, save=False, total=True, results_dir="./results"):
-    T = data['treatment']
-    Y = data['outcome']
+def plot_outcome_distribution(dataset, save=False, total=True, results_dir="./results"):
+    T = dataset['T']
+    Y = dataset['Y']
     fig, axs = plt.subplots(1, 2+total, figsize=(12+6*total, 5))
     colors = ['Y2F', 'B2F']
     for i, color in enumerate(colors):

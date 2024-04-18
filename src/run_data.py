@@ -1,7 +1,5 @@
-from data import load_data
-from model import get_embeddings
 import argparse
-
+from data import PPCI
 
 def get_parser():
     parser = argparse.ArgumentParser()
@@ -15,32 +13,18 @@ def get_parser():
     parser.add_argument("--verbose", type=bool, default=True, help="Verbose")
     return parser
 
-
 def main(args):
-    data = load_data(
-        environment=args.environment,
-        data_dir=args.data_dir,
-        generate=args.generate,
-        reduce_fps_factor=args.reduce_fps_factor,
-        downscale_factor=args.downscale_factor,
-        verbose=args.verbose,
-    )
-
-    encoder_names = ["vit", "dino", "clip", "vit_large", "clip_large", "mae"]
-    tokens = ["class", "mean"]
-    for encoder_name in encoder_names:
-        for token in tokens:
-            get_embeddings(
-                data,
-                encoder_name,
-                environment=args.environment,
-                batch_size=args.batch_size,
-                num_proc=args.num_proc,
-                data_dir=args.data_dir,
-                token=token,
-                verbose=args.verbose,
-            ) 
-
+    encoders = ["vit", "dino", "clip", "vit_large", "clip_large", "mae"]
+    for encoder in encoders:
+        PPCI(encoder = encoder,
+             token = "all",
+             task = "all",
+             split_criteria = "experiment",
+             environment = "all",
+             batch_size = args.batch_size, 
+             num_proc = args.num_proc,
+             data_dir = args.data_dir,
+             verbose = args.verbose)
 
 if __name__ == "__main__":
     args = get_parser().parse_args()

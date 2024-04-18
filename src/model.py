@@ -35,43 +35,56 @@ def get_model(encoder_name, device="cpu"):
         raise ValueError(f"Encoder name: {encoder_name} is not implemented.")
     return processor, model
 
+def get_embeddings(data, encoder_name, batch_size=100, num_proc=4, data_dir="./data", token="class", verbose=True):
+    if token in ["class", "mean"]:
+        data_emb_dir = os.path.join(data_dir, "embeddings", token, encoder_name)
+        if os.path.exists(data_emb_dir):
+            environments = [f.name for f in os.scandir(data_emb_dir) if f.is_dir()]
+            if (data.environment in environments):
+                if verbose: print(f"Embeddings from encoder '{encoder_name}' token '{token}' already extracted for the {data.environment} environment.")
+                data_emb_env_dir = os.path.join(data_emb_dir, data.environment)
+                embeddings = Dataset.load_from_disk(data_emb_env_dir)
+                X = embeddings[encoder_name]
+                X.encoder_name = encoder_name
+                X.token = token
+                return X
+        else:
+            os.makedirs(data_emb_dir)
 
-def get_embeddings(data, encoder_name, batch_size=100, num_proc=4, environment="supervised", data_dir="./data", token="class", verbose=True):
-    data_emb_dir = os.path.join(data_dir, "embeddings", token, encoder_name)
-    if os.path.exists(data_emb_dir):
-        environments = [f.name for f in os.scandir(data_emb_dir) if f.is_dir()]
-        if (environment in environments):
-            if verbose: print(f"Embeddings from encoder '{encoder_name}' token '{token}' already extracted.")
-            data_emb_env_dir = os.path.join(data_emb_dir, environment)
-            embeddings = Dataset.load_from_disk(data_emb_env_dir)
-            return embeddings
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Device: {device}")
+        processor, model = get_model(encoder_name, device)
+        model.eval().requires_grad_(False)
+        # data = data.map(lambda x: {"emb1": encoder(x["image"], model, processor, device)}, batch_size=batch_size, batched=True, num_proc=num_proc)
+        dataloader = DataLoader(
+            data,
+            batch_size=batch_size,
+            num_workers=num_proc,
+            pin_memory=True,
+            shuffle=False,
+        )
+        embeddings = []
+        for batch in tqdm(dataloader):
+            embedding = encoder(batch["image"], model, processor, device, token)
+            embeddings.append(embedding)
+        embeddings = torch.cat(embeddings, 0)
+        embeddings = Dataset.from_dict({encoder_name: embeddings.tolist()})
+        embeddings.set_format(type="torch", columns=[encoder_name])
+        data_emb_env_dir = os.path.join(data_emb_dir, data.environment)
+        embeddings.save_to_disk(data_emb_env_dir)
+        if verbose: print(f"Embeddings from encoder '{encoder_name}' token '{token}' computed and saved correctly for the {data.environment} environment..")
+        X = embeddings[encoder_name]
+        X.encoder_name = encoder_name
+        X.token = token
+    elif token=="all":
+        embeddings_class = get_embeddings(data, encoder_name, batch_size=batch_size, num_proc=num_proc, data_dir=data_dir, token="class", verbose=verbose)
+        embeddings_mean = get_embeddings(data, encoder_name, batch_size=batch_size, num_proc=num_proc, data_dir=data_dir, token="mean", verbose=verbose)
+        X = torch.cat((embeddings_class, embeddings_mean), dim=1)
+        X.token = "all"
     else:
-        os.makedirs(data_emb_dir)
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
-    processor, model = get_model(encoder_name, device)
-    model.eval().requires_grad_(False)
-    # data = data.map(lambda x: {"emb1": encoder(x["image"], model, processor, device)}, batch_size=batch_size, batched=True, num_proc=num_proc)
-    dataloader = DataLoader(
-        data,
-        batch_size=batch_size,
-        num_workers=num_proc,
-        pin_memory=True,
-        shuffle=False,
-    )
-    embeddings = []
-    for batch in tqdm(dataloader):
-        embedding = encoder(batch["image"], model, processor, device, token)
-        embeddings.append(embedding)
-    embeddings = torch.cat(embeddings, 0)
-    embeddings = Dataset.from_dict({encoder_name: embeddings.tolist()})
-    embeddings.set_format(type="torch", columns=[encoder_name])
-    data_emb_env_dir = os.path.join(data_emb_dir, environment)
-    embeddings.save_to_disk(data_emb_env_dir)
-    if verbose: print(f"Embeddings from encoder '{encoder_name}' token '{token}' computed and saved correctly.")
-    return embeddings
-
+        raise ValueError("Token criteria not recognized. Please select between: 'class', 'mean', 'all'.")
+    X.encoder_name = encoder_name
+    return X
 
 def encoder(x, model, processor, device, token="class"):
     inputs = processor(images=x, return_tensors="pt").to(device)
@@ -91,7 +104,7 @@ def encoder(x, model, processor, device, token="class"):
     return emb.to("cpu")
 
 class MLP(nn.Module):
-    def __init__(self, input_size, hidden_size, task):
+    def __init__(self, input_size, hidden_nodes, hidden_layers, task):
         super().__init__()
         self.task = task
         if task=="all":
@@ -101,13 +114,15 @@ class MLP(nn.Module):
         else:
             output_size = 1
         self.output_size = output_size
-        self.model = nn.Sequential(
-                            nn.Linear(input_size, 2*hidden_size),
-                            nn.ReLU(),
-                            #nn.Linear(2*hidden_size, hidden_size),
-                            #nn.ReLU(),
-                            nn.Linear(2*hidden_size, output_size),
-                        )
+        
+        layers = []
+        layers.append(nn.Linear(input_size, hidden_nodes))
+        for _ in range(hidden_layers):
+            layers.append(nn.ReLU())
+            layers.append(nn.Linear(hidden_nodes, hidden_nodes))
+        layers.append(nn.ReLU())
+        layers.append(nn.Linear(hidden_nodes, output_size))
+        self.model = nn.Sequential(*layers)
         self.init_weights()
         
     def init_weights(self):

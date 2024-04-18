@@ -6,7 +6,7 @@ from econml.dml import CausalForestDML
 from econml.metalearners import TLearner, SLearner, XLearner
 from econml.dr import DRLearner
 
-def compute_ate(Y, T, X, method="AIPW", color="preselected", model_propensity = LogisticRegression(), model_outcome = None, verbose=True):
+def compute_ate(Y, T, X, method="aipw", color="preselected", model_propensity = LogisticRegression(), model_outcome = None, T_control=1, T_treatment=2):
     if color=="yellow":
         Y = Y[:,0]
     elif color=="blue":
@@ -50,14 +50,16 @@ def compute_ate(Y, T, X, method="AIPW", color="preselected", model_propensity = 
                                 )
     else:
         raise ValueError(f"'{method}' method for ATE estimation not implemented.")
-    model.fit(Y=Y[T!=2].int(), T=T[T!=2].int(), X=X[T!=2])
-    ATE_B = model.effect(X[T!=2]).mean()
-    model.fit(Y=Y[T!=1].int(), T=(T[T!=1]/2).int(), X=X[T!=1])
-    ATE_inf = model.effect(X[T!=1]).mean()
-    if verbose: 
-        print(f"Color: {color}; Method: {method}")
-        print(f"    ATE_B: {ATE_B:.3f}; ATE_inf: {ATE_inf:.3f}")
-    return ATE_B, ATE_inf
+    Y = Y[(T==T_control) | (T==T_treatment)].int()
+    X = X[(T==T_control) | (T==T_treatment)]
+    T = T[(T==T_control) | (T==T_treatment)].int()
+    T[T==T_control] = 0
+    T[T==T_treatment] = 1
+    model.fit(Y = Y, 
+              T = T, 
+              X = X)
+    ate = model.effect(X).mean()
+    return ate
 
 class EAD:
     def __init__(self):
