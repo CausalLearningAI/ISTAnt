@@ -1,4 +1,6 @@
 data*
+results*
+logs*
 __pycache__/
 
 venv/
