@@ -12,27 +12,26 @@ def get_parser():
     parser.add_argument("--batch_size", type=int, default=256, help="Batch size")
     parser.add_argument("--hidden_nodes", type=int, default=256, help="Number of nodes per hidden layer")
     parser.add_argument("--num_epochs", type=int, default=10, help="Number of epochs")
-    parser.add_argument("--num_proc", type=int, default=4, help="Number of processes")
+    parser.add_argument("--num_proc", type=int, default=6, help="Number of processes")
     parser.add_argument("--verbose", type=bool, default=False, help="Verbose")
 
     return parser
 
-
 def main(args):
-    encoders = ["clip"]#, "clip_large", "dino", "mae", "vit", "vit_large"]
-    tokens = ["class"]#, "mean", "all"]
-    split_criterias = ["experiment"]#, "experiment_easy", "position", "position_easy", "random", "random_easy"]
+    encoders = ["dino", "clip_large", "clip", "mae", "vit", "vit_large"]
+    tokens = ["class", "mean", "all"]
+    split_criterias = ["experiment", "experiment_easy", "position", "position_easy", "random", "random_easy"]
     tasks = ["all", "or"] #, "yellow", "blue", "sum"]
     
     hidden_layerss = [1,2]
-    lrs = [0.1, 0.01, 0.001]
-    seeds = [0]#, 1, 2, 3, 4]
+    lrs = [0.05, 0.005, 0.0005]
+    seeds = [0, 1, 2, 3, 4]
     colors = ["yellow", "blue"]
 
     n_exp = len(encoders)*len(tokens)*len(tasks)*len(split_criterias)*len(hidden_layerss)*len(lrs)*len(seeds)
     k = 0
     start_time = time.time()
-    results = pd.DataFrame(columns=["encoder", "token", "split_criteria", "hidden_layers", "task", "lr", "seed", "color", 'train', 'acc', 'balanced_acc', 'bias', 'bias_d', 'tr_equality_control', 'tr_equality_treatment', 'ead', 'ead_offset', 'ead_offset_d', 'aipw_offset', 'aipw_offset_d'])
+    results = pd.DataFrame(columns=["encoder", "token", "split_criteria", "hidden_layers", "task", "lr", "seed", "color", 'train', 'acc', 'balanced_acc', 'bias', 'bias_d', 'oe_co', 'oe_tr', 'tr_equality_control', 'tr_equality_treatment', 'ead', 'aipw', 'ead_hat', 'ead_hat_d', 'aipw_hat', 'aipw_hat_d', 'best_epoch'])
     for encoder in encoders:
         print("Encoder: ", encoder)
         for token in tokens:
@@ -84,6 +83,7 @@ def main(args):
                                             result["seed"] = seed
                                             result["color"] = color
                                             result["train"] = train
+                                            result["best_epoch"] = dataset.model.best_epoch
                                             results.loc[len(results.index)] = result
                                     else:
                                         result = dataset.evaluate(color=task, train=train, verbose=False)
@@ -96,6 +96,7 @@ def main(args):
                                         result["seed"] = seed
                                         result["color"] = task
                                         result["train"] = train
+                                        result["best_epoch"] = dataset.model.best_epoch
                                         results.loc[len(results.index)] = result
     
     results.to_csv(f"{args.results_dir}/experiments_result.csv")
