@@ -48,7 +48,7 @@ class PPCI():
         self.results_dir = results_dir
         if verbose: print("Prediction-Powered Causal Inference dataset successfully loaded.")
     
-    def train(self, batch_size=1024, num_epochs=10, lr=0.001, hidden_nodes = 512, hidden_layers = 2, verbose=True, add_pred_env="supervised", seed=1, save=True):
+    def train(self, batch_size=256, num_epochs=10, lr=0.001, hidden_nodes=256, hidden_layers=2, verbose=True, add_pred_env="supervised", seed=0, save=False):
         set_seed(seed)
         self.model = train_model(self.supervised["X"], 
                                  self.supervised["Y"], 
@@ -72,7 +72,10 @@ class PPCI():
             raise ValueError(f"Invalid add_pred_env argumen '{add_pred_env}', please select among: 'supervised', 'unsupervised', or 'all'.")
     
     def plot_out_distribution(self, save=True, total=True):
-        plot_outcome_distribution(self.supervised, save=save, total=total, results_dir=self.results_dir)
+        if self.task=="all":
+            plot_outcome_distribution(self.supervised, save=save, total=total, results_dir=self.results_dir)
+        else:
+            raise ValueError("Plot available only for task: 'all'.")
 
     def add_pred(self, environment="supervised"):
         if hasattr(self, 'model'):
@@ -118,10 +121,11 @@ class PPCI():
             balanced_acc = get_metric(Y_, Y_hat_.round(), metric="balanced_acc")
             bias = get_metric(Y_, Y_hat_, metric="bias")
             bias_d = get_metric(Y_, Y_hat_.round(), metric="bias")
-            # TODO: add tr_equity statistic test
             tr_equality_control = get_metric(Y_[T_==T_control], Y_hat_[T_==T_control].round(), metric="tr_equality") 
             tr_equality_treatment = get_metric(Y_[T_==T_treatment], Y_hat_[T_==T_treatment].round(), metric="tr_equality")
             # causal effect
+            oe_co = get_metric(Y[self.supervised["T"]==T_control], Y_hat[self.supervised["T"]==T_control].round(), metric="overestimate") 
+            oe_tr = get_metric(Y[self.supervised["T"]==T_treatment], Y_hat[self.supervised["T"]==T_treatment].round(), metric="overestimate")
             ead = compute_ate(Y, 
                               self.supervised["T"], 
                               self.supervised["W"], 
@@ -129,46 +133,56 @@ class PPCI():
                               color="preselected", 
                               T_control=T_control, 
                               T_treatment=T_treatment)
-            ead_offset = compute_ate(Y_hat, 
-                              self.supervised["T"], 
-                              self.supervised["W"], 
-                              method="ead", 
-                              color="preselected", 
-                              T_control=T_control, 
-                              T_treatment=T_treatment) - ead
-            ead_offset_d = compute_ate(Y_hat.round(), 
-                              self.supervised["T"], 
-                              self.supervised["W"], 
-                              method="ead", 
-                              color="preselected", 
-                              T_control=T_control, 
-                              T_treatment=T_treatment) - ead
-            aipw_offset = compute_ate(Y_hat, 
+            aipw = compute_ate(Y, 
                               self.supervised["T"], 
                               self.supervised["W"], 
                               method="aipw", 
                               color="preselected", 
                               T_control=T_control, 
-                              T_treatment=T_treatment) - ead
-            aipw_offset_d = compute_ate(Y_hat, 
+                              T_treatment=T_treatment)
+            ead_hat = compute_ate(Y_hat, 
+                              self.supervised["T"], 
+                              self.supervised["W"], 
+                              method="ead", 
+                              color="preselected", 
+                              T_control=T_control, 
+                              T_treatment=T_treatment)
+            ead_hat_d = compute_ate(Y_hat.round(), 
+                              self.supervised["T"], 
+                              self.supervised["W"], 
+                              method="ead", 
+                              color="preselected", 
+                              T_control=T_control, 
+                              T_treatment=T_treatment) 
+            aipw_hat = compute_ate(Y_hat, 
                               self.supervised["T"], 
                               self.supervised["W"], 
                               method="aipw", 
                               color="preselected", 
                               T_control=T_control, 
-                              T_treatment=T_treatment) - ead
+                              T_treatment=T_treatment) 
+            aipw_hat_d = compute_ate(Y_hat.round(), 
+                              self.supervised["T"], 
+                              self.supervised["W"], 
+                              method="aipw", 
+                              color="preselected", 
+                              T_control=T_control, 
+                              T_treatment=T_treatment) 
             metric = {
                 "acc": acc,
                 "balanced_acc": balanced_acc,
                 "bias": bias,
                 "bias_d": bias_d,
+                "oe_co": oe_co,
+                "oe_tr": oe_tr,
                 "tr_equality_control": tr_equality_control,
                 "tr_equality_treatment": tr_equality_treatment,
                 "ead": ead,
-                "ead_offset": ead_offset,
-                "ead_offset_d": ead_offset_d,
-                "aipw_offset": aipw_offset,
-                "aipw_offset_d": aipw_offset_d,
+                "aipw": aipw,
+                "ead_hat": ead_hat,
+                "ead_hat_d": ead_hat_d,
+                "aipw_hat": aipw_hat,
+                "aipw_hat_d": aipw_hat_d,
             }
             if verbose: print(metric)
             return metric
