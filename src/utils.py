@@ -1,4 +1,5 @@
 import torch
+import random
 import os
 
 def check_folder(folder):
@@ -6,6 +7,7 @@ def check_folder(folder):
         os.makedirs(folder)
 
 def set_seed(seed):
+    random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -47,6 +49,10 @@ def get_metric(Y, Y_hat, metric="accuracy"):
             metric = (recall+specificy)/2
         elif metric == "bias":
             metric =  ((Y_hat-Y)**2).mean()
+        elif metric == "overestimate":
+            FP = ((Y != 1) & (Y_hat == 1)).sum()
+            FN = ((Y == 1) & (Y_hat != 1)).sum()
+            metric = (FP-FN)/len(Y)
         elif metric == "tr_equality":
             FP = ((Y != 1) & (Y_hat == 1)).sum()
             FN = ((Y == 1) & (Y_hat != 1)).sum()
