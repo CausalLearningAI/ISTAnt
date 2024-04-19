@@ -308,9 +308,9 @@ def get_split(dataset, split_criteria="experiment"):
     elif split_criteria=="experiment_easy":
         split = (dataset["experiment"] != 4) # tr_ration: 4/5
     elif split_criteria=="position":
-        split = (dataset["position"] == 0) # tr_ration: 1/9
+        split = (dataset["position"] == 1) # tr_ration: 1/9
     elif split_criteria=="position_easy":
-        split = (dataset["position"] != 9) # tr_ration: 8/9
+        split = (dataset["position"] != 8) # tr_ration: 8/9
     elif split_criteria=="random":
         split = torch.zeros_like(dataset["experiment"], dtype=torch.bool)
         exps = [0,0,1,1,2,2,3,3,4]
