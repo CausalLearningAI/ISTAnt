@@ -7,8 +7,8 @@ from utils import get_time_string
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_dir", type=str, default="./data/istant_lq", help="Path to the data directory")
-    parser.add_argument("--results_dir", type=str, default="./results/istant_lq", help="Path to the results directory")
+    parser.add_argument("--data_dir", type=str, default="./data/istant_hq", help="Path to the data directory")
+    parser.add_argument("--results_dir", type=str, default="./results/istant_hq", help="Path to the results directory")
     parser.add_argument("--batch_size", type=int, default=256, help="Batch size")
     parser.add_argument("--hidden_nodes", type=int, default=256, help="Number of nodes per hidden layer")
     parser.add_argument("--num_epochs", type=int, default=10, help="Number of epochs")
@@ -31,7 +31,7 @@ def main(args):
     n_exp = len(encoders)*len(tokens)*len(tasks)*len(split_criterias)*len(hidden_layerss)*len(lrs)*len(seeds)
     k = 0
     start_time = time.time()
-    results = pd.DataFrame(columns=["encoder", "token", "split_criteria", "hidden_layers", "task", "lr", "seed", "color", 'train', 'acc', 'balanced_acc', 'bias', 'bias_d', 'oe_co', 'oe_tr', 'tr_equality_control', 'tr_equality_treatment', 'ead', 'aipw', 'ead_hat', 'ead_hat_d', 'aipw_hat', 'aipw_hat_d', 'best_epoch'])
+    results = pd.DataFrame(columns=["encoder", "token", "split_criteria", "hidden_layers", "task", "lr", "seed", "color", "loss_val", "acc_val", "bacc_val", "TEB_val", "acc", "bacc", "TEB", "TEB_bin", "EAD"])#, 'best_epoch'])
     for encoder in encoders:
         print("Encoder: ", encoder)
         for token in tokens:
@@ -70,23 +70,9 @@ def main(args):
                                 end_time_i = time.time()
                                 print(f"Experiment {k}/{n_exp} completed; Speed: {round(end_time_i-start_time_i, 1)}s/train, Total time elapsed {get_time_string(end_time_i - start_time)} (out of {get_time_string((end_time_i - start_time)/k*n_exp)}).")
                                 
-                                for train in [True, False]:
-                                    if task == "all":
-                                        for color in colors:
-                                            result = dataset.evaluate(color=color, train=train, verbose=False)
-                                            result["encoder"] = encoder
-                                            result["token"] = token
-                                            result["split_criteria"] = split_criteria
-                                            result["hidden_layers"] = hidden_layers
-                                            result["task"] = task
-                                            result["lr"] = lr
-                                            result["seed"] = seed
-                                            result["color"] = color
-                                            result["train"] = train
-                                            result["best_epoch"] = dataset.model.best_epoch
-                                            results.loc[len(results.index)] = result
-                                    else:
-                                        result = dataset.evaluate(color=task, train=train, verbose=False)
+                                if task == "all":
+                                    for color in colors:
+                                        result = dataset.evaluate(color=color, verbose=False)
                                         result["encoder"] = encoder
                                         result["token"] = token
                                         result["split_criteria"] = split_criteria
@@ -94,10 +80,21 @@ def main(args):
                                         result["task"] = task
                                         result["lr"] = lr
                                         result["seed"] = seed
-                                        result["color"] = task
-                                        result["train"] = train
-                                        result["best_epoch"] = dataset.model.best_epoch
+                                        result["color"] = color
+                                        #result["best_epoch"] = dataset.model.best_epoch
                                         results.loc[len(results.index)] = result
+                                else:
+                                    result = dataset.evaluate(color=task, verbose=False)
+                                    result["encoder"] = encoder
+                                    result["token"] = token
+                                    result["split_criteria"] = split_criteria
+                                    result["hidden_layers"] = hidden_layers
+                                    result["task"] = task
+                                    result["lr"] = lr
+                                    result["seed"] = seed
+                                    result["color"] = task
+                                    #result["best_epoch"] = dataset.model.best_epoch
+                                    results.loc[len(results.index)] = result
     
     results.to_csv(f"{args.results_dir}/experiments_result.csv")
 

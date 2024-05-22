@@ -47,7 +47,7 @@ def get_metric(Y, Y_hat, metric="accuracy"):
             recall = TP / (TP + FN)
             specificy = TN / (TN + FP)
             metric = (recall+specificy)/2
-        elif metric == "bias":
+        elif metric == "mse":
             metric =  ((Y_hat-Y)**2).mean()
         elif metric == "overestimate":
             FP = ((Y != 1) & (Y_hat == 1)).sum()

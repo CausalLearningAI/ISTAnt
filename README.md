@@ -1,6 +1,6 @@
 # ISTAnt
 
-Automatic treatment effect estimation on ecological data with partial labelling
+Automatic treatment effect estimation on ecological data with partial labelling.
 
 ## Dataset description
 

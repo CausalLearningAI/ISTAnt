@@ -3,7 +3,7 @@ from data import PPCI
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_dir", type=str, default="./data/istant_lq", help="Path to the data directory")
+    parser.add_argument("--data_dir", type=str, default="./data/istant_hq", help="Path to the data directory")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
     parser.add_argument("--num_proc", type=int, default=5, help="Number of processes")
     parser.add_argument("--environment", type=str, default="supervised", help="Environment")
@@ -20,9 +20,10 @@ def main(args):
              token = "all",
              task = "all",
              split_criteria = "experiment",
-             environment = "all",
+             environment = "unsupervised",
              batch_size = args.batch_size, 
              num_proc = args.num_proc,
+             generate = args.generate, 
              data_dir = args.data_dir,
              verbose = args.verbose)
 

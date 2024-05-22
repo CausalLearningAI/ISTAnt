@@ -2,7 +2,6 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 from copy import deepcopy
 from utils import get_metric
-
 from model import MLP
 
 def train_model(X, y, split, batch_size=1024, num_epochs=20, hidden_nodes = 512, hidden_layers = 1, lr=0.0001, verbose=True):
@@ -59,6 +58,7 @@ def train_model(X, y, split, batch_size=1024, num_epochs=20, hidden_nodes = 512,
             if y.task != "all": 
                 y_val_pred = y_val_pred.reshape(-1,1)
                 y_val = y_val.reshape(-1,1)
+                y_val.task = y.task
             # TODO: reimplement faster
             val_b_acc = sum([get_metric(y_val[:,i], y_val_pred[:,i], metric="balanced_acc") for i in range(y_val.shape[1])])/y_val.shape[1]
             #val_loss = loss_fn(model(X_val.to(device)).squeeze(), y_val.to(device)).item()
@@ -81,10 +81,12 @@ def train_model(X, y, split, batch_size=1024, num_epochs=20, hidden_nodes = 512,
     return best_model
 
 def evaluate_model(model, X, y, device="cpu"):
+    task = y.task
     model.eval()
     with torch.no_grad():
         y_pred = model.pred(X.to(device)).to("cpu").squeeze()
-        if y.task=="all":
+        y = y.squeeze()
+        if task=="all":
             accs = [acc.item() for acc in (y_pred == y).float().mean(dim=0)]
             #accs.append((y_pred.sum(dim=1) == y.sum(dim=1)).float().mean(dim=0))
             TP = ((y == 1) & (y_pred == 1)).sum(dim=0)
@@ -95,14 +97,14 @@ def evaluate_model(model, X, y, device="cpu"):
             # TN = ((y != 1) & (y_pred != 1)).sum(dim=0)
             # specificies = [spec.item() for spec in (TN / (TN + FP))]
             # accs_b = [(rec+spec)/2 for rec,spec in zip(recalls, specificies)]
-        elif y.task in ["yellow", "blue", "or"]:
+        elif task in ["yellow", "blue", "or"]:
             accs = [(y_pred == y).float().mean(dim=0).item()]
             TP = ((y == 1) & (y_pred == 1)).sum()
             FP = ((y != 1) & (y_pred == 1)).sum()
             precisions = [(TP / (TP + FP)).item()]
             FN = ((y == 1) & (y_pred != 1)).sum()
             recalls = [(TP / (TP + FN)).item()]
-        elif y.task=="sum":
+        elif task=="sum":
             accs = [(y_pred == y).float().mean(dim=0).item()]
             precisions = []
             recalls = []
