@@ -1,10 +1,10 @@
 # ISTAnt
 
-Automatic treatment effect estimation on ecological data with partial labelling.
+Automatic treatment effect estimation on ecological data with partial labeling.
 
-## Dataset description
+## Dataset
 
-### Data structure
+The data set can be preliminary inspected [here](https://drive.google.com/drive/folders/1ZTPusp-u3pAtrs2LtA3JUaFXbuqDS7K_?usp=sharing). We will publish a de-anonymized project page after the review process.
 
 ### Example
 
@@ -19,11 +19,8 @@ Automatic treatment effect estimation on ecological data with partial labelling.
   </tr>
 </table>
 
-### Data Distribution
 
-![Outcome distribution](results/instant_lq/outcome_distribution.png)
-
-### Research Question
+## Research Question
 
 Identify and estimate:
 $$ATE_{B} := \mathbb{E}[Y|do(T=1)]- \mathbb{E}[Y|do(T=0)]$$
