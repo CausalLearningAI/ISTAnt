@@ -23,5 +23,10 @@ The data set can be preliminary inspected [here](https://drive.google.com/drive/
 ## Research Question
 
 Identify and estimate:
+
+$$ATE := \mathbb{E}[Y|do(T=1)]- \mathbb{E}[Y|do(T=0)]$$
+
+<!--
 $$ATE_{B} := \mathbb{E}[Y|do(T=1)]- \mathbb{E}[Y|do(T=0)]$$
 $$ATE_{INF} := \mathbb{E}[Y|do(T=2)]- \mathbb{E}[Y|do(T=0)]$$
+-->
