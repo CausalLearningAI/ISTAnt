@@ -1,5 +1,6 @@
 import torch
 import pandas as pd
+import numpy as np
 import random
 import matplotlib.pyplot as plt
 import scipy.stats as stats
@@ -8,7 +9,7 @@ import os
 
 from datasets import Dataset
 from model import get_embeddings, MLP
-from train import train_model
+from train import train_, train_md
 from visualize import plot_outcome_distribution
 from utils import get_metric, set_seed, check_folder
 from causal import compute_ate
@@ -52,29 +53,46 @@ class PPCI():
         self.results_dir = results_dir
         if verbose: print("Prediction-Powered Causal Inference dataset successfully loaded.")
     
-    def train(self, batch_size=256, num_epochs=10, lr=0.001, hidden_nodes=256, hidden_layers=2, verbose=True, add_pred_env="supervised", seed=0, save=False, force=False):
+    def train(self, batch_size=256, num_epochs=10, lr=0.001, hidden_nodes=256, hidden_layers=2, verbose=True, add_pred_env="supervised", seed=0, save=False, force=False, multidomain=False, ic_weight=1):
         set_seed(seed)
-        model_path = os.path.join(self.results_dir, "models", self.encoder, self.token, self.split_criteria, self.task, str(hidden_layers), str(lr), str(seed), "model.pth")
-        if os.path.exists(model_path) and not force:
-            if verbose: print("Model already trained.")
-            self.model = MLP(self.supervised["X"].shape[1], hidden_nodes, hidden_layers, task=self.supervised["Y"].task)
-            self.model.load_state_dict(torch.load(model_path))
-            self.model.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            self.model.to(self.model.device)
+        # model_path = os.path.join(self.results_dir, "models", self.encoder, self.token, self.split_criteria, self.task, str(hidden_layers), str(lr), str(seed), "model.pth")
+        # if os.path.exists(model_path) and not force:
+        #     if verbose: print("Model already trained.")
+        #     self.model = MLP(self.supervised["X"].shape[1], hidden_nodes, hidden_layers, task=self.supervised["Y"].task)
+        #     self.model.load_state_dict(torch.load(model_path))
+        #     self.model.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #     self.model.to(self.model.device)
+        # else:
+        if multidomain:
+            W = self.supervised["W"]
+            exp_id = W[:, -5:] @ np.array([0,1,2,3,4])
+            pos_id = W[:, 0] + 1 + 3*(W[:, 1] + 1)
+            self.env_id = exp_id + 5*pos_id
+            self.model = train_md(self.supervised["X"], 
+                                  self.supervised["Y"], 
+                                self.env_id, 
+                                batch_size=batch_size, 
+                                num_epochs=num_epochs, 
+                                lr=lr, 
+                                hidden_nodes = hidden_nodes, 
+                                hidden_layers = hidden_layers,
+                                verbose=verbose,
+                                ic_weight=ic_weight)
+            self.supervised["split"] = self.model.split
         else:
-            self.model = train_model(self.supervised["X"], 
-                                    self.supervised["Y"], 
-                                    self.supervised["split"], 
-                                    batch_size=batch_size, 
-                                    num_epochs=num_epochs, 
-                                    lr=lr, 
-                                    hidden_nodes = hidden_nodes, 
-                                    hidden_layers = hidden_layers,
-                                    verbose=verbose)
-            if save:
-                model_dir = os.path.join(self.results_dir, "models", self.encoder, self.token, self.split_criteria, self.task, str(hidden_layers), str(lr), str(seed))
-                check_folder(model_dir)
-                torch.save(self.model.state_dict(), os.path.join(model_dir, "model.pth"))
+            self.model = train_(self.supervised["X"], 
+                                self.supervised["Y"], 
+                                self.supervised["split"], 
+                                batch_size=batch_size, 
+                                num_epochs=num_epochs, 
+                                lr=lr, 
+                                hidden_nodes = hidden_nodes, 
+                                hidden_layers = hidden_layers,
+                                verbose=verbose)
+            # if save:
+            #     model_dir = os.path.join(self.results_dir, "models", self.encoder, self.token, self.split_criteria, self.task, str(hidden_layers), str(lr), str(seed))
+            #     check_folder(model_dir)
+            #     torch.save(self.model.state_dict(), os.path.join(model_dir, "model.pth"))
         if add_pred_env in ["supervised", "unsupervised"]:
             self.add_pred(add_pred_env)
         elif add_pred_env=="all":
@@ -123,20 +141,42 @@ class PPCI():
             W = self.supervised["W"]
             T = self.supervised["T"]
             split = self.supervised["split"]
-            n_val = 1000
+            n_val = 3600
+            set_seed(0)
             idx = random.sample(range(0, (~split).sum()), n_val)
             #idx = list(range(0, n_val))
             Y_val = Y[~split][idx]
             Y_hat_val = Y_hat[~split][idx]
             T_val = T[~split][idx]
             W_val = W[~split][idx]
+            Y_train = Y[split]
+            Y_hat_train = Y_hat[split]
+            T_train = T[split]
+            W_train = W[split]
+            Y_train_val = torch.cat([Y_train, Y_val])
+            Y_hat_train_val = torch.cat([Y_hat_train, Y_hat_val])
+            T_train_val = torch.cat([T_train, T_val])
+            W_train_val = torch.cat([W_train, W_val])
             # validation
-            pos_wwight = ((Y[split]==0).sum(dim=0)/(Y[split]==1).sum(dim=0))#.to(device)
-            loss_fn = torch.nn.BCELoss(weight=pos_wwight)
+            pos_weight = ((Y[split]==0).sum(dim=0)/(Y[split]==1).sum(dim=0))#.to(device)
+            loss_fn = torch.nn.BCELoss(weight=pos_weight)
             loss_val = loss_fn(Y_hat_val, Y_val).item()
+            losses = []
+            for i in np.unique(self.env_id):
+                idx_i = self.env_id[~split][idx]==i
+                if sum(idx_i)>0:
+                    loss_i = loss_fn(Y_hat_val[idx_i], Y_val[idx_i]).item()
+                    losses.append(loss_i)
+            inv_loss_val = np.var(losses)
             acc_val = get_metric(Y_val, Y_hat_val.round(), metric="accuracy")
             bacc_val = get_metric(Y_val, Y_hat_val.round(), metric="balanced_acc")
-            TEB_val = compute_ate(Y_hat_val,T_val, W_val, method="ead", color=color, T_control=T_control, T_treatment=T_treatment) - compute_ate(Y_val, T_val, W_val, method="ead", color=color, T_control=T_control, T_treatment=T_treatment)
+            # print(compute_ate(Y_train, T_train, W_train, method="ead", color=color, T_control=T_control, T_treatment=T_treatment))
+            # print(compute_ate(Y_hat_train, T_train, W_train, method="ead", color=color, T_control=T_control, T_treatment=T_treatment))
+            # print(compute_ate(Y_train_val, T_train_val, W_train_val, method="ead", color=color, T_control=T_control, T_treatment=T_treatment))
+            # print(compute_ate(Y_hat_train_val, T_train_val, W_train_val, method="ead", color=color, T_control=T_control, T_treatment=T_treatment))
+            # print(compute_ate(Y_train_val, T_train_val, W_train_val, method="aipw", color=color, T_control=T_control, T_treatment=T_treatment))
+            # print(compute_ate(Y_hat_train_val, T_train_val, W_train_val, method="aipw", color=color, T_control=T_control, T_treatment=T_treatment))
+            TEB_val = compute_ate(Y_hat_val, T_val, W_val, method="aipw", color=color, T_control=T_control, T_treatment=T_treatment) - compute_ate(Y_val, T_val, W_val, method="aipw", color=color, T_control=T_control, T_treatment=T_treatment)
             
             # all
             acc = get_metric(Y, Y_hat.round(), metric="accuracy")
@@ -147,6 +187,7 @@ class PPCI():
  
             metric = {
                 "loss_val": loss_val,
+                "inv_loss_val": inv_loss_val,
                 "acc_val": acc_val,
                 "bacc_val": bacc_val,
                 "TEB_val": TEB_val,
@@ -287,6 +328,16 @@ def get_outcome(dataset, task="all"):
         raise ValueError(f"Task {task} not defined. Please select between: 'all', 'yellow', 'blue', 'sum', 'or'.")
     y.task = task
     return y
+
+def env2split(env_id, split_criteria):
+    if split_criteria=="experiment":
+        split = (env_id < 9)
+    elif split_criteria=="experiment_easy":
+        split = (env_id < 36)
+    elif split_criteria=="position":
+        split = (env_id % 9 == 0)
+    # TODO: finish
+
 
 def get_split(dataset, split_criteria="experiment"):
     if split_criteria=="experiment":
