@@ -47,6 +47,14 @@ def get_metric(Y, Y_hat, metric="accuracy"):
             recall = TP / (TP + FN)
             specificy = TN / (TN + FP)
             metric = (recall+specificy)/2
+        elif metric == "recall":
+            TP = ((Y == 1) & (Y_hat == 1)).sum()
+            FN = ((Y == 1) & (Y_hat != 1)).sum()
+            metric = TP / (TP + FN)
+        elif metric == "precision":
+            TP = ((Y == 1) & (Y_hat == 1)).sum()
+            FP = ((Y != 1) & (Y_hat == 1)).sum()
+            metric = TP / (TP + FP)
         elif metric == "mse":
             metric =  ((Y_hat-Y)**2).mean()
         elif metric == "overestimate":

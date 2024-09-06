@@ -1,27 +1,27 @@
 import torch
 import pandas as pd
+import numpy as np
 import random
 import matplotlib.pyplot as plt
-import scipy.stats as stats
 import cv2
 import os
 
 from datasets import Dataset
 from model import get_embeddings, MLP
-from train import train_model
+from train import train_, train_md
 from visualize import plot_outcome_distribution
 from utils import get_metric, set_seed, check_folder
 from causal import compute_ate
 
 class PPCI():
     def __init__(self, task="all", encoder="dino", token="class", split_criteria="experiment", reduce_fps_factor=15, downscale_factor=1, batch_size=100, num_proc=4, environment="all", generate=False, data_dir="./data/istant_lq", results_dir="./results/istant_lq", verbose=False):
-        # TODO: fix generate option
+        # TODO: check generate option
         if environment in ["all", "supervised"]:
             self.supervised = load_env("supervised", 
                                     task=task, 
                                     encoder=encoder, 
-                                    token=token, 
-                                    split_criteria=split_criteria, 
+                                    token=token,
+                                    split_criteria=split_criteria,
                                     reduce_fps_factor=reduce_fps_factor, 
                                     downscale_factor=downscale_factor,
                                     batch_size=batch_size, 
@@ -34,8 +34,8 @@ class PPCI():
             self.unsupervised = load_env("unsupervised", 
                                     task=task, 
                                     encoder=encoder, 
-                                    token=token, 
-                                    split_criteria=split_criteria, 
+                                    token=token,  
+                                    split_criteria=split_criteria,
                                     reduce_fps_factor=reduce_fps_factor, 
                                     downscale_factor=downscale_factor,
                                     batch_size=batch_size, 
@@ -52,38 +52,48 @@ class PPCI():
         self.results_dir = results_dir
         if verbose: print("Prediction-Powered Causal Inference dataset successfully loaded.")
     
-    def train(self, batch_size=256, num_epochs=10, lr=0.001, hidden_nodes=256, hidden_layers=2, verbose=True, add_pred_env="supervised", seed=0, save=False, force=False):
+    def train(self, batch_size=256, num_epochs=10, lr=0.001, hidden_nodes=256, hidden_layers=2, verbose=True, add_pred_env="supervised", seed=0, save=False, force=False, multidomain=False, ic_weight=1):
+        # TODO: check saving options
         set_seed(seed)
-        model_path = os.path.join(self.results_dir, "models", self.encoder, self.token, self.split_criteria, self.task, str(hidden_layers), str(lr), str(seed), "model.pth")
-        if os.path.exists(model_path) and not force:
-            if verbose: print("Model already trained.")
-            self.model = MLP(self.supervised["X"].shape[1], hidden_nodes, hidden_layers, task=self.supervised["Y"].task)
-            self.model.load_state_dict(torch.load(model_path))
-            self.model.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            self.model.to(self.model.device)
+        # model_path = os.path.join(self.results_dir, "models", self.encoder, self.token, self.split_criteria, self.task, str(hidden_layers), str(lr), str(seed), "model.pth")
+        # if os.path.exists(model_path) and not force:
+        #     if verbose: print("Model already trained.")
+        #     self.model = MLP(self.supervised["X"].shape[1], hidden_nodes, hidden_layers, task=self.supervised["Y"].task)
+        #     self.model.load_state_dict(torch.load(model_path))
+        #     self.model.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #     self.model.to(self.model.device)
+        # else:
+        if multidomain:
+            self.model = train_md(self.supervised, 
+                                  batch_size=batch_size, 
+                                  num_epochs=num_epochs, 
+                                  lr=lr, 
+                                  hidden_nodes = hidden_nodes, 
+                                  hidden_layers = hidden_layers,
+                                  verbose=verbose,
+                                  ic_weight=ic_weight)
         else:
-            self.model = train_model(self.supervised["X"], 
-                                    self.supervised["Y"], 
-                                    self.supervised["split"], 
-                                    batch_size=batch_size, 
-                                    num_epochs=num_epochs, 
-                                    lr=lr, 
-                                    hidden_nodes = hidden_nodes, 
-                                    hidden_layers = hidden_layers,
-                                    verbose=verbose)
-            if save:
-                model_dir = os.path.join(self.results_dir, "models", self.encoder, self.token, self.split_criteria, self.task, str(hidden_layers), str(lr), str(seed))
-                check_folder(model_dir)
-                torch.save(self.model.state_dict(), os.path.join(model_dir, "model.pth"))
+            self.model = train_(self.supervised, 
+                                batch_size=batch_size, 
+                                num_epochs=num_epochs, 
+                                lr=lr, 
+                                hidden_nodes = hidden_nodes, 
+                                hidden_layers = hidden_layers,
+                                verbose=verbose)
+            # if save:
+            #     model_dir = os.path.join(self.results_dir, "models", self.encoder, self.token, self.split_criteria, self.task, str(hidden_layers), str(lr), str(seed))
+            #     check_folder(model_dir)
+            #     torch.save(self.model.state_dict(), os.path.join(model_dir, "model.pth"))
         if add_pred_env in ["supervised", "unsupervised"]:
             self.add_pred(add_pred_env)
         elif add_pred_env=="all":
             self.add_pred("supervised")
             self.add_pred("unsupervised")
         else:
-            raise ValueError(f"Invalid add_pred_env argumen '{add_pred_env}', please select among: 'supervised', 'unsupervised', or 'all'.")
+            raise ValueError(f"Invalid add_pred_env argument '{add_pred_env}', please select among: 'supervised', 'unsupervised', or 'all'.")
     
     def plot_out_distribution(self, save=True, total=True):
+        # TODO: check if works
         if self.task=="all":
             plot_outcome_distribution(self.supervised, save=save, total=total, results_dir=self.results_dir)
         else:
@@ -105,7 +115,8 @@ class PPCI():
         else:
             raise ValueError("Train the model first, before computing the inference step.")
     
-    def evaluate(self, color="blue", T_control=1, T_treatment=2, verbose=False):
+    def evaluate(self, color="blue", T_control=1, T_treatment=2, verbose=False, subsample_val=False):
+        # TODO: use ratio for subsample_val
         if "Y_hat" in self.supervised:
             if self.task=="all":
                 if color=="yellow":
@@ -122,22 +133,33 @@ class PPCI():
             color = "preselected"
             W = self.supervised["W"]
             T = self.supervised["T"]
+            E = self.supervised["E"]
             split = self.supervised["split"]
-            n_val = 1000
-            idx = random.sample(range(0, (~split).sum()), n_val)
-            #idx = list(range(0, n_val))
+            if subsample_val:
+                n_val = 3600 # replace with ratio
+                set_seed(0)
+                idx = random.sample(range(0, (~split).sum()), n_val)
+            else:
+                idx = range(0, (~split).sum())
             Y_val = Y[~split][idx]
             Y_hat_val = Y_hat[~split][idx]
             T_val = T[~split][idx]
             W_val = W[~split][idx]
+            E_val = E[~split][idx]
+            
             # validation
-            pos_wwight = ((Y[split]==0).sum(dim=0)/(Y[split]==1).sum(dim=0))#.to(device)
-            loss_fn = torch.nn.BCELoss(weight=pos_wwight)
+            pos_weight = ((Y[split]==0).sum(dim=0)/(Y[split]==1).sum(dim=0))#.to(device)
+            loss_fn = torch.nn.BCELoss(weight=pos_weight)
             loss_val = loss_fn(Y_hat_val, Y_val).item()
+            losses = []
+            for i in np.unique(E_val):
+                idx_i = E_val==i
+                loss_i = loss_fn(Y_hat_val[idx_i], Y_val[idx_i]).item()
+                losses.append(loss_i)
+            inv_loss_val = np.var(losses)
             acc_val = get_metric(Y_val, Y_hat_val.round(), metric="accuracy")
             bacc_val = get_metric(Y_val, Y_hat_val.round(), metric="balanced_acc")
-            TEB_val = compute_ate(Y_hat_val,T_val, W_val, method="ead", color=color, T_control=T_control, T_treatment=T_treatment) - compute_ate(Y_val, T_val, W_val, method="ead", color=color, T_control=T_control, T_treatment=T_treatment)
-            
+            TEB_val = compute_ate(Y_hat_val, T_val, W_val, method="ead", color=color, T_control=T_control, T_treatment=T_treatment) - compute_ate(Y_val, T_val, W_val, method="aipw", color=color, T_control=T_control, T_treatment=T_treatment)
             # all
             acc = get_metric(Y, Y_hat.round(), metric="accuracy")
             bacc = get_metric(Y, Y_hat.round(), metric="balanced_acc")
@@ -147,6 +169,7 @@ class PPCI():
  
             metric = {
                 "loss_val": loss_val,
+                "inv_loss_val": inv_loss_val,
                 "acc_val": acc_val,
                 "bacc_val": bacc_val,
                 "TEB_val": TEB_val,
@@ -289,6 +312,7 @@ def get_outcome(dataset, task="all"):
     return y
 
 def get_split(dataset, split_criteria="experiment"):
+    # TODO: clean
     if split_criteria=="experiment":
         split = (dataset["experiment"] == 0) # tr_ration: 1/5
     elif split_criteria=="experiment_easy":
@@ -336,14 +360,25 @@ def load_env(environment='supervised', task="all", encoder="mae", token="class",
         dataset = Dataset.load_from_disk(data_env_dir)
     dataset.set_format(type="torch", columns=["image", "treatment", "outcome", 'pos_x', 'pos_y', 'exp_minute', 'day_hour', 'frame', "experiment", "position"], output_all_columns=True)
     dataset.environment = environment
+    W = get_covariates(dataset)
+    if 'istant' in data_dir:
+        exp_id = W[:, -5:] @ np.array([0,1,2,3,4])
+        pos_id = W[:, 0] + 1 + 3*(W[:, 1] + 1)
+        E = (exp_id + 5*pos_id).to(torch.int64)
+    else:
+        raise ValueError(f"Unknown 'enviornment' definition for dataset: {data_dir}")
     dataset_dict = {
         "source_data": dataset,
         "X": get_embeddings(dataset, encoder, batch_size=batch_size, num_proc=num_proc, data_dir=data_dir, token=token, verbose=verbose),
         "Y": get_outcome(dataset, task=task),
-        "split": get_split(dataset, split_criteria=split_criteria),
-        "W": get_covariates(dataset), 
+        "W": W, 
+        "E": E,
         "T": dataset["treatment"],
+        "split": get_split(dataset, split_criteria=split_criteria),
     }
+    if verbose: 
+        print("Training Environments: ", np.unique(E[dataset_dict["split"]]))
+        print("Validation Environments: ", np.unique(E[~dataset_dict["split"]]))
     return dataset_dict
 
 def generator(reduce_fps_factor, downscale_factor, environment='supervised', data_dir="./data"):
