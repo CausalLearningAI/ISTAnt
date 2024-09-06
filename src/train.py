@@ -67,8 +67,11 @@ def train_(supervised, batch_size=1024, num_epochs=20, hidden_nodes = 512, hidde
                 best_model = deepcopy(model)
                 best_model.best_epoch = epoch
 
-        train_metrics.append([train_accs, val_baccs, train_precisions, train_recalls])
+        train_metrics.append([train_accs, train_baccs, train_precisions, train_recalls])
         val_metrics.append([val_accs, val_baccs, val_precisions, val_recalls])
+
+    best_model.train_metrics = train_metrics
+    best_model.val_metrics = val_metrics
 
     return best_model
 
@@ -165,7 +168,7 @@ def train_md(supervised, batch_size=1024, num_epochs=20, hidden_nodes = 256, hid
                 best_model = deepcopy(model)
                 best_model.best_epoch = epoch
 
-        train_metrics.append([train_accs, val_baccs, train_precisions, train_recalls])
+        train_metrics.append([train_accs, train_baccs, train_precisions, train_recalls])
         val_metrics.append([val_accs, val_baccs, val_precisions, val_recalls])
 
     best_model.train_metrics = train_metrics
