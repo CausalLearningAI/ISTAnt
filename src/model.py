@@ -114,16 +114,17 @@ class MLP(nn.Module):
         else:
             output_size = 1
         self.output_size = output_size
-        
+
         layers = []
-        layers.append(nn.Linear(input_size, hidden_nodes))
         for _ in range(hidden_layers):
+            layers.append(nn.Linear(input_size, input_size))
             layers.append(nn.ReLU())
-            layers.append(nn.Linear(hidden_nodes, hidden_nodes))
-        layers.append(nn.ReLU())
-        layers.append(nn.Linear(hidden_nodes, output_size))
-        self.model = nn.Sequential(*layers)
-        self.init_weights()
+        self.featurizer = nn.Sequential(*layers)
+        self.head = nn.Sequential(nn.Linear(input_size, hidden_nodes), 
+                             nn.ReLU(), 
+                             nn.Linear(hidden_nodes, output_size))
+        self.model = nn.Sequential(self.featurizer, self.head)
+        self.init_weights() # check if works
         
     def init_weights(self):
         for m in self.modules():
@@ -132,15 +133,17 @@ class MLP(nn.Module):
                 nn.init.constant_(m.bias, 0.0)
 
     def forward(self, X):
-        return self.model(X) # [-1.8, 0.4]
+        self.representation = self.featurizer(X)
+        return self.head(self.representation) # [-1.8, 0.4]
+    
     def probs(self, X):
         if self.task=="sum":
-            return self.model(X).softmax(dim=-1) # [0.7, 0.1, 0.2]
+            return self.forward(X).softmax(dim=-1) # [0.7, 0.1, 0.2]
         else:
-            return self.model(X).sigmoid() # [0.8, 0.4]
+            return self.forward(X).sigmoid() # [0.8, 0.4]
     def pred(self, X):
         if self.task=="sum":
-            return torch.argmax(self.model(X), dim=-1) # [0]
+            return torch.argmax(self.forward(X), dim=-1) # [0]
         else:
             return self.probs(X).round() # [1, 0]
     def cond_exp(self, X):
@@ -150,5 +153,22 @@ class MLP(nn.Module):
             return torch.matmul(probs, values) # [0.5]
         else:
             return self.probs(X) # [0.8, 0.4]
+
+class ContrastiveLossCosine(nn.Module):
+    def __init__(self, margin=0.5):
+        super(ContrastiveLossCosine, self).__init__()
+        self.margin = margin
+
+    def forward(self, embedding1, embedding2, label):
+        # Calculate the cosine similarity between the two embeddings
+        cosine_similarity = nn.functional.cosine_similarity(embedding1, embedding2)
+        # Transform cosine similarity to cosine distance
+        cosine_distance = 1 - cosine_similarity
+        # Calculate the contrastive loss
+        loss = torch.mean(
+            (1 - label) * torch.pow(cosine_distance, 2) +
+            label * torch.pow(torch.clamp(cosine_distance - self.margin, min=0.0), 2)
+        )
         
+        return loss     
     

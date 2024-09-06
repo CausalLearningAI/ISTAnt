@@ -4,7 +4,7 @@ Automatic treatment effect estimation on ecological data with partial labeling.
 
 ## Dataset
 
-The data set can be preliminary inspected [here](https://drive.google.com/drive/folders/1ZTPusp-u3pAtrs2LtA3JUaFXbuqDS7K_?usp=sharing). We will publish a de-anonymized project page after the review process.
+The data set can be preliminarily inspected [here](https://figshare.com/s/0970e149cfe72089c771?file=48137317). After the review process, we will publish a de-anonymized project page.
 
 ### Example
 
@@ -26,7 +26,37 @@ Identify and estimate:
 
 $$ATE := \mathbb{E}[Y|do(T=1)]- \mathbb{E}[Y|do(T=0)]$$
 
-<!--
-$$ATE_{B} := \mathbb{E}[Y|do(T=1)]- \mathbb{E}[Y|do(T=0)]$$
-$$ATE_{INF} := \mathbb{E}[Y|do(T=2)]- \mathbb{E}[Y|do(T=0)]$$
--->
+
+## Analyses
+
+### Biases Investigation
+
+_Experiments (run)_: [run_experiments.py](https://github.com/CausalLearningAI/InvarianceCRL/blob/main/src/run_experiments.py)
+
+_Experiments (visualize)_: [biases.ipynb](https://github.com/CausalLearningAI/InvarianceCRL/blob/main/experiments/biases.ipynb)
+
+_Reference_: [Smoke and Mirrors in Causal Downstream Tasks](https://arxiv.org/abs/2405.17151)
+
+```bibtex
+@article{cadei2024smoke,
+  title={Smoke and Mirrors in Causal Downstream Tasks},
+  author={Cadei, Riccardo and Lindorfer, Lukas and Cremer, Sylvia and Schmid, Cordelia and Locatello, Francesco},
+  journal={arXiv preprint arXiv:2405.17151},
+  year={2024}
+}
+```
+
+### Enforcing Experiment Setting Invariance
+
+_Experiments Notebook:_ [invariance.ipynb](https://github.com/CausalLearningAI/InvarianceCRL/blob/main/experiments/invariance.ipynb)
+
+_Reference:_ [Unifying Causal Representation Learning with the Invariance Principle](https://www.arxiv.org/abs/2409.02772)
+
+```bibtex
+@article{yao2024unifying,
+  title={Unifying Causal Representation Learning with the Invariance Principle},
+  author={Dingling, Yao and Rancati, Dario and Cadei, Riccardo and Fumero, Marco and Locatello, Francesco},
+  journal={arXiv preprint arXiv:2409.02772},
+  year={2024}
+}
+```
