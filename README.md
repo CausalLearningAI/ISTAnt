@@ -2,7 +2,7 @@
 
 Automatic treatment effect estimation on ecological data with partial labeling.
 
-## Dataset description
+## Dataset
 
 The data set can be preliminarily inspected [here](https://figshare.com/s/0970e149cfe72089c771?file=48137317). After the review process, we will publish a de-anonymized project page.
 
@@ -19,12 +19,13 @@ The data set can be preliminarily inspected [here](https://figshare.com/s/0970e1
   </tr>
 </table>
 
-### Research Question
 
+## Research Question
 
 Identify and estimate:
 
 $$ATE := \mathbb{E}[Y|do(T=1)]- \mathbb{E}[Y|do(T=0)]$$
+
 
 ## Analyses
 
