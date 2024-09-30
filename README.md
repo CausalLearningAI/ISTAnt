@@ -31,9 +31,9 @@ $$ATE := \mathbb{E}[Y|do(T=1)]- \mathbb{E}[Y|do(T=0)]$$
 
 ### Biases Investigation
 
-_Experiments (run)_: [run_experiments.py](https://github.com/CausalLearningAI/InvarianceCRL/blob/main/src/run_experiments.py)
+_Experiments (run)_: [run_experiments.py](https://github.com/CausalLearningAI/ISTAnt/blob/main/src/run_experiments.py)
 
-_Experiments (visualize)_: [biases.ipynb](https://github.com/CausalLearningAI/InvarianceCRL/blob/main/experiments/biases.ipynb)
+_Experiments (visualize)_: [biases.ipynb](https://github.com/CausalLearningAI/ISTAnt/blob/main/experiments/biases.ipynb)
 
 _Reference_: [Smoke and Mirrors in Causal Downstream Tasks](https://arxiv.org/abs/2405.17151)
 
@@ -48,7 +48,7 @@ _Reference_: [Smoke and Mirrors in Causal Downstream Tasks](https://arxiv.org/ab
 
 ### Enforcing Experiment Setting Invariance
 
-_Experiments Notebook:_ [invariance.ipynb](https://github.com/CausalLearningAI/InvarianceCRL/blob/main/experiments/invariance.ipynb)
+_Experiments Notebook:_ [invariance.ipynb](https://github.com/CausalLearningAI/ISTAnt/blob/main/experiments/invariance.ipynb)
 
 _Reference:_ [Unifying Causal Representation Learning with the Invariance Principle](https://www.arxiv.org/abs/2409.02772)
 
