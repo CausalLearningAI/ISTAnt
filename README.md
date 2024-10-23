@@ -7,7 +7,7 @@ Prediction-powered causal inference on high-dimensional data pipeline for automa
 ### Requirements
 
 Using Conda: 
-```
+```conda
 conda env create -f environment.yml
 ```
 
