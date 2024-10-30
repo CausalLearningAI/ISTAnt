@@ -57,6 +57,8 @@ _Reference_: [Smoke and Mirrors in Causal Downstream Tasks](https://arxiv.org/ab
 }
 ```
 
+Further analyses on a synthetic data set (CausalMNIST) are reported at [https://github.com/CausalLearningAI/CausalMNIST](https://github.com/CausalLearningAI/CausalMNIST).
+
 ### Enforcing Experiment Setting Invariance
 
 _Experiments Notebook:_ [invariance.ipynb](https://github.com/CausalLearningAI/ISTAnt/blob/main/experiments/invariance.ipynb)
